@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <title>Bottle Shuffle</title>
+    <!--
+      YouTube Playables SDK integration point (future task):
+      The official YouTube Playables SDK script must be loaded here before
+      game scripts execute when YouTube Playables integration is enabled.
+    -->
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background-color: #191528;
+        touch-action: none;
+        user-select: none;
+        -webkit-user-select: none;
+        -webkit-touch-callout: none;
+      }
+
+      #game-container {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+
+      #game-container canvas {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="game-container" role="application" aria-label="Bottle Shuffle game canvas"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
