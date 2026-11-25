@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { COLORS } from '../design-system/tokens/colors';
+import { Colors } from '../design-system/tokens/Colors';
 import { APP_METADATA, REFERENCE_RESOLUTION } from './appConfig';
 
 export interface GameConfigOptions {
@@ -11,7 +11,7 @@ export function createGameConfig(options: GameConfigOptions): Phaser.Types.Core.
   return {
     type: Phaser.AUTO,
     parent: options.parent ?? APP_METADATA.containerId,
-    backgroundColor: COLORS.background,
+    backgroundColor: Colors.Surface.Background,
     scale: {
       mode: Phaser.Scale.RESIZE,
       autoCenter: Phaser.Scale.CENTER_BOTH,
