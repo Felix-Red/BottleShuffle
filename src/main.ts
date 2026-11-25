@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { createGameConfig } from './config/gameConfig';
 import { BootScene } from './game/scenes/BootScene';
 import { HomeScene } from './game/scenes/HomeScene';
+import { SCENE_KEYS, type SceneKey } from './game/scenes/sceneKeys';
 import type { GamePlatform, Unsubscribe } from './platform/contracts/GamePlatform';
 import { createPlatform } from './platform/createPlatform';
 
@@ -29,11 +30,50 @@ function bindPlatformLifecycle(game: Phaser.Game, platform: GamePlatform): Unsub
   };
 }
 
+async function waitForLocalFonts(): Promise<void> {
+  if (typeof globalThis.document === 'undefined' || !('fonts' in globalThis.document)) {
+    return;
+  }
+
+  const fontLoadPromises = [
+    globalThis.document.fonts.load('700 32px "Fredoka"'),
+    globalThis.document.fonts.load('400 18px "Nunito"'),
+    globalThis.document.fonts.load('700 18px "Nunito"'),
+  ];
+
+  const timeout = new Promise<void>((resolve) => {
+    globalThis.setTimeout(resolve, 600);
+  });
+
+  await Promise.race([Promise.allSettled(fontLoadPromises).then(() => undefined), timeout]);
+}
+
 async function bootstrap(): Promise<void> {
   const platform = createPlatform();
-  await platform.initialize();
+  await Promise.all([platform.initialize(), waitForLocalFonts()]);
 
-  const scenes = [new BootScene(platform), new HomeScene(platform)];
+  let initialSceneKey: SceneKey = SCENE_KEYS.HOME;
+  const scenes: Phaser.Scene[] = [];
+
+  if (import.meta.env.DEV) {
+    const params = new URLSearchParams(globalThis.location.search);
+    if (params.get('scene') === 'showcase') {
+      const { ComponentShowcaseScene, parseShowcasePageParam } =
+        await import('./game/scenes/ComponentShowcaseScene');
+      const initialPage = parseShowcasePageParam(params.get('page'));
+      initialSceneKey = SCENE_KEYS.SHOWCASE;
+      scenes.push(
+        new BootScene(platform, initialSceneKey),
+        new HomeScene(platform),
+        new ComponentShowcaseScene(platform, initialPage),
+      );
+    }
+  }
+
+  if (scenes.length === 0) {
+    scenes.push(new BootScene(platform, initialSceneKey), new HomeScene(platform));
+  }
+
   const game = new Phaser.Game(createGameConfig({ scenes }));
   const unbindLifecycle = bindPlatformLifecycle(game, platform);
 

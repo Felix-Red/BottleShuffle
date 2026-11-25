@@ -4,13 +4,13 @@ import {
   computeViewportMetrics,
   REFERENCE_RESOLUTION,
 } from '../../src/config/appConfig';
-import { COLORS } from '../../src/design-system/tokens/colors';
+import { Colors } from '../../src/design-system/tokens/Colors';
 
 describe('appConfig and viewport metrics', () => {
   it('defines a landscape-first 1280x720 reference resolution', () => {
     expect(REFERENCE_RESOLUTION).toEqual({ width: 1280, height: 720 });
     expect(APP_METADATA.containerId).toBe('game-container');
-    expect(COLORS.background).toBe('#191528');
+    expect(Colors.Surface.Background).toBe('#171126');
   });
 
   it('returns scale 1.0 at the exact landscape reference resolution', () => {

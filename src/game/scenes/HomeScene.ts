@@ -1,7 +1,6 @@
 import Phaser from 'phaser';
 import { APP_METADATA, computeViewportMetrics } from '../../config/appConfig';
-import { COLORS } from '../../design-system/tokens/colors';
-import { TYPOGRAPHY } from '../../design-system/tokens/typography';
+import { Colors, createTextStyle, hexToNumber, lightenHex, Typography } from '../../design-system';
 import type { GamePlatform } from '../../platform/contracts/GamePlatform';
 import { SCENE_KEYS } from './sceneKeys';
 
@@ -18,22 +17,22 @@ const EMBLEM_BOTTLES: readonly BottleSpec[] = [
     offsetX: -48,
     offsetY: 3,
     angleDeg: -11,
-    bodyColor: COLORS.bottleRedHex,
-    labelColor: COLORS.bottleRedLabelHex,
+    bodyColor: hexToNumber(Colors.Bottle.Red),
+    labelColor: hexToNumber(lightenHex(Colors.Bottle.Red, 0.2)),
   },
   {
     offsetX: 0,
     offsetY: 0,
     angleDeg: 0,
-    bodyColor: COLORS.bottlePurpleHex,
-    labelColor: COLORS.bottlePurpleLabelHex,
+    bodyColor: hexToNumber(Colors.Brand.PrimaryLight),
+    labelColor: hexToNumber(lightenHex(Colors.Brand.PrimaryLight, 0.2)),
   },
   {
     offsetX: 48,
     offsetY: 3,
     angleDeg: 11,
-    bodyColor: COLORS.bottleGreenHex,
-    labelColor: COLORS.bottleGreenLabelHex,
+    bodyColor: hexToNumber(Colors.Bottle.Green),
+    labelColor: hexToNumber(lightenHex(Colors.Bottle.Green, 0.2)),
   },
 ];
 
@@ -48,17 +47,19 @@ export class HomeScene extends Phaser.Scene {
   }
 
   public create(): void {
-    this.cameras.main.setBackgroundColor(COLORS.backgroundHex);
+    this.cameras.main.setBackgroundColor(hexToNumber(Colors.Surface.Background));
 
     this.heroContainer = this.buildHeroContent();
     this.footerText = this.add
-      .text(0, 0, APP_METADATA.studioLabel, {
-        fontFamily: TYPOGRAPHY.fontFamily,
-        fontSize: `${String(TYPOGRAPHY.footerSizePx)}px`,
-        fontStyle: '500',
-        color: COLORS.textMuted,
-        letterSpacing: 4,
-      })
+      .text(
+        0,
+        0,
+        APP_METADATA.studioLabel,
+        createTextStyle(Typography.LabelSmall, {
+          color: Colors.Text.Disabled,
+          align: 'center',
+        }),
+      )
       .setOrigin(0.5, 1);
 
     this.layout(this.scale.width, this.scale.height);
@@ -76,22 +77,27 @@ export class HomeScene extends Phaser.Scene {
     emblem.setPosition(0, -104);
 
     const titleText = this.add
-      .text(0, 22, APP_METADATA.title, {
-        fontFamily: TYPOGRAPHY.fontFamily,
-        fontSize: `${String(TYPOGRAPHY.titleSizePx)}px`,
-        fontStyle: '800',
-        color: COLORS.textPrimary,
-        letterSpacing: 5,
-      })
+      .text(
+        0,
+        22,
+        APP_METADATA.title,
+        createTextStyle(Typography.HeadlineLarge, {
+          color: Colors.Text.Primary,
+          align: 'center',
+        }),
+      )
       .setOrigin(0.5);
 
     const subtitleText = this.add
-      .text(0, 80, APP_METADATA.buildLabel, {
-        fontFamily: TYPOGRAPHY.fontFamily,
-        fontSize: `${String(TYPOGRAPHY.subtitleSizePx)}px`,
-        fontStyle: '400',
-        color: COLORS.textSecondary,
-      })
+      .text(
+        0,
+        82,
+        APP_METADATA.buildLabel,
+        createTextStyle(Typography.BodyLarge, {
+          color: Colors.Text.Secondary,
+          align: 'center',
+        }),
+      )
       .setOrigin(0.5);
 
     const statusContainer = this.buildStatusBadge();
@@ -105,7 +111,7 @@ export class HomeScene extends Phaser.Scene {
     const emblem = this.add.container(0, 0);
 
     const backdrop = this.add.graphics();
-    backdrop.fillStyle(COLORS.surfaceSubtleHex, 1);
+    backdrop.fillStyle(hexToNumber(Colors.Surface.Surface), 1);
     backdrop.fillCircle(0, 0, 86);
     emblem.add(backdrop);
 
@@ -133,7 +139,7 @@ export class HomeScene extends Phaser.Scene {
     graphics.fillRoundedRect(-8, -56, 16, 30, 4);
 
     // Bottle cap
-    graphics.fillStyle(COLORS.bottleCapHex, 1);
+    graphics.fillStyle(hexToNumber(Colors.Text.Primary), 1);
     graphics.fillRoundedRect(-9, -68, 18, 13, 3);
 
     // Subtle front label
@@ -147,12 +153,14 @@ export class HomeScene extends Phaser.Scene {
     const badge = this.add.container(0, 0);
 
     const statusText = this.add
-      .text(0, 0, APP_METADATA.statusLabel, {
-        fontFamily: TYPOGRAPHY.fontFamily,
-        fontSize: `${String(TYPOGRAPHY.statusSizePx)}px`,
-        fontStyle: '500',
-        color: COLORS.statusSuccessText,
-      })
+      .text(
+        0,
+        0,
+        APP_METADATA.statusLabel,
+        createTextStyle(Typography.BodyMedium, {
+          color: Colors.Semantic.Success,
+        }),
+      )
       .setOrigin(0, 0.5);
 
     const dotRadius = 6;
@@ -161,7 +169,7 @@ export class HomeScene extends Phaser.Scene {
     const startX = -totalWidth / 2;
 
     const dot = this.add.graphics();
-    dot.fillStyle(COLORS.statusSuccessHex, 1);
+    dot.fillStyle(hexToNumber(Colors.Semantic.Success), 1);
     dot.fillCircle(startX + dotRadius, 0, dotRadius);
 
     statusText.setPosition(startX + dotRadius * 2 + gap, 0);
