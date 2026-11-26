@@ -1,6 +1,9 @@
 import Phaser from 'phaser';
 import { createGameConfig } from './config/gameConfig';
+import { isDifficultyId } from './core';
+import type { GameplaySceneData } from './game/gameplay/GameplaySceneData';
 import { BootScene } from './game/scenes/BootScene';
+import { GameScene } from './game/scenes/GameScene';
 import { HomeScene } from './game/scenes/HomeScene';
 import { SCENE_KEYS, type SceneKey } from './game/scenes/sceneKeys';
 import type { GamePlatform, Unsubscribe } from './platform/contracts/GamePlatform';
@@ -53,6 +56,7 @@ async function bootstrap(): Promise<void> {
   await Promise.all([platform.initialize(), waitForLocalFonts()]);
 
   let initialSceneKey: SceneKey = SCENE_KEYS.HOME;
+  let devGameLaunchData: GameplaySceneData | undefined;
   const scenes: Phaser.Scene[] = [];
 
   if (import.meta.env.DEV) {
@@ -67,6 +71,7 @@ async function bootstrap(): Promise<void> {
       scenes.push(
         new BootScene(platform, initialSceneKey),
         new HomeScene(platform),
+        new GameScene(platform),
         new ComponentShowcaseScene(platform, initialPage),
       );
     } else if (requestedScene === 'assets') {
@@ -77,13 +82,32 @@ async function bootstrap(): Promise<void> {
       scenes.push(
         new BootScene(platform, initialSceneKey),
         new HomeScene(platform),
+        new GameScene(platform),
         new AssetShowcaseScene(platform, initialPage),
       );
+    } else if (requestedScene === 'game') {
+      const diffParam = params.get('difficulty');
+      const seedParam = params.get('seed');
+      const countParam = params.get('count');
+      const parsedCount = countParam !== null ? Number(countParam) : undefined;
+
+      devGameLaunchData = {
+        ...(diffParam !== null && isDifficultyId(diffParam) ? { difficulty: diffParam } : {}),
+        ...(seedParam !== null && seedParam.trim().length > 0 ? { seed: seedParam.trim() } : {}),
+        ...(parsedCount !== undefined && Number.isInteger(parsedCount)
+          ? { bottleCount: parsedCount }
+          : {}),
+      };
+      initialSceneKey = SCENE_KEYS.GAME;
     }
   }
 
   if (scenes.length === 0) {
-    scenes.push(new BootScene(platform, initialSceneKey), new HomeScene(platform));
+    scenes.push(
+      new BootScene(platform, initialSceneKey),
+      new HomeScene(platform),
+      new GameScene(platform, devGameLaunchData),
+    );
   }
 
   const game = new Phaser.Game(createGameConfig({ scenes }));

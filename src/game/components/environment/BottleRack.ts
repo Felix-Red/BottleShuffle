@@ -106,12 +106,24 @@ export class BottleRack extends Phaser.GameObjects.Container {
     return this;
   }
 
-  public resize(availableWidth: number, availableHeight: number, aspectRatio?: number): this {
+  public resize(
+    availableWidth: number,
+    availableHeight: number,
+    aspectRatio?: number,
+    options?: Partial<
+      Pick<
+        BottleRackLayoutInput,
+        'maxBottleWidth' | 'maxBottleHeight' | 'horizontalSpacing' | 'verticalSpacing'
+      >
+    >,
+  ): this {
     this.availableWidth = availableWidth;
     this.availableHeight = availableHeight;
-    if (aspectRatio !== undefined) {
-      this.layoutOptions = { ...this.layoutOptions, aspectRatio };
-    }
+    this.layoutOptions = {
+      ...this.layoutOptions,
+      ...(aspectRatio !== undefined ? { aspectRatio } : {}),
+      ...(options ?? {}),
+    };
     this.layoutResult = this.computeLayout();
     this.rebuildVisuals();
     return this;

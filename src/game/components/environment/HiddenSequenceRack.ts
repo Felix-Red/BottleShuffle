@@ -105,6 +105,11 @@ export class HiddenSequenceRack extends Phaser.GameObjects.Container {
     return this;
   }
 
+  public setCaptionVisible(visible: boolean): this {
+    this.captionText?.setVisible(visible);
+    return this;
+  }
+
   /**
    * Future win-state reveal interface.
    * Accepts an externally computed ordered array of texture keys.

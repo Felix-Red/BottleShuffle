@@ -74,9 +74,27 @@ This document tracks completed milestones, technical notes, and planned upcoming
 - **Client-side boundary:** Isolating `targetSequence` inside `GameEngine` prevents accidental disclosure through UI contracts, not browser DevTools inspection.
 - **Deferred features:** Visual gameplay scene, swap animations, timers, scoring/stars, level unlocking, undo, persistence, audio, and YouTube Playables SDK integration remain deferred to subsequent tasks.
 
+### Task 06: Gameplay Screen and Engine Integration — Completed
+
+- Integrated pure `PuzzleGenerator` and `GameEngine` with Phaser 3 into a playable end-to-end `GameScene` (`src/game/scenes/GameScene.ts`):
+  - Implemented monotonic `GameplayClock` (`src/services/GameplayClock.ts`) tracking active elapsed time with independent manual-pause, modal-suspension, platform-suspension, and completion states (`MM:SS` formatting).
+  - Implemented pure responsive `calculateGameplayLayout` (`src/game/layout/GameplayLayout.ts`) supporting landscape and portrait viewports across 3–10 bottles (including 2×5 cross-row portrait layouts).
+  - Implemented pure `GameplayController` (`src/game/gameplay/GameplayController.ts`) and `GameplayViewState` strictly consuming public gameplay data without duplicating domain rules or exposing hidden target sequences.
+  - Built reusable gameplay UI components (`GameplayHeader`, `GameplayHUD`, `GameplayBoard`, `GameplayInstructions`) reusing `MatchCounter`, `StatCard`, `IconButton`, `Modal`, `ConfirmDialog`, `BottleRack`, `BottleSprite`, and `HiddenSequenceRack`, and added the `'pause'` vector icon to `IconGraphic.ts`.
+  - Wired tap-to-select/swap, tap-outside-to-deselect, simple interruptible swap position tweens, aggregate match-delta feedback, pause overlay, restart confirmation, completion overlay, keyboard navigation (`ArrowLeft`/`ArrowRight`/`Enter`/`Space`/`Escape`), browser/platform lifecycle suspension, and error recovery modal.
+  - Updated temporary `HomeScene` with a difficulty selector driven directly by `ALL_DIFFICULTY_DEFINITIONS` (3, 4, 5, 6, 8, 10 bottles) and a Play button launching `GameScene` (plus dev-only `/?scene=game` direct launch route).
+- Added unit and integration test suites (`GameplayClock.test.ts`, `GameplayLayout.test.ts`, `GameplayController.test.ts`, `GameplayIntegration.test.ts`).
+- Authored `docs/GAMEPLAY_SCREEN.md` and updated `README.md` and `docs/PROGRESS.md`.
+
+#### Known Limitations & Assumptions (Task 06)
+
+- **Simple swap presentation:** Swaps currently use a clean linear/cubic position tween; curved swap arcs, celebratory effects, and audio feedback are deferred to Task 07+.
+- **Temporary overlays & home screen:** Pause, completion, and home screens are intentionally functional development layouts; final home design, scoring/stars, level unlocking, settings persistence, drag-and-drop swapping, and YouTube Playables SDK integration remain deferred to subsequent tasks.
+- **Canvas accessibility:** Basic keyboard slot navigation and focus highlighting are implemented, while full screen-reader accessibility over canvas remains a known Phaser limitation.
+
 ## Upcoming Tasks (Planned)
 
-- **Interactive Gameplay Scene & Animations (`src/game/`):** Wiring `GameEngine` to `BottleRack`, `BottleSprite`, `HiddenSequenceRack`, `MatchCounter`, animated bottle swaps, and input locking during transitions.
+- **Polish, Animations & Audio (`src/game/` & `src/services/`):** Curved swap trajectories, juice/celebration feedback, drag-and-drop support, and locally bundled SFX/music respecting `GamePlatform` audio preferences.
 - **Level & Difficulty Progression:** Level definitions, bottle counts, scoring/move tracking, and persistence service built on `GamePlatform`.
 - **Interactive Gameplay Scene:** Wiring `BottleRack`, `BottleSprite`, `HiddenSequenceRack`, `MatchCounter`, swap animations, and input handling to `src/core/`.
 - **Audio System:** Local SFX/music playback respecting `GamePlatform` audio preferences and pause/resume lifecycle events.
