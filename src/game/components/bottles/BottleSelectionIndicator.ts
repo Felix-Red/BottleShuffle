@@ -4,6 +4,7 @@ import { Colors, hexToNumber } from '../../../design-system/tokens/Colors';
 import {
   MotionDurations,
   MotionEasings,
+  MotionParams,
   resolveMotionDuration,
 } from '../../../design-system/tokens/Motion';
 import { EFFECT_TEXTURE_KEYS } from '../../assets/AssetKeys';
@@ -49,7 +50,7 @@ export class BottleSelectionIndicator extends Phaser.GameObjects.Container {
       .image(0, 0, EFFECT_TEXTURE_KEYS.SELECTION_GLOW)
       .setOrigin(0.5, 0.5)
       .setDisplaySize(this.frameWidth, this.frameHeight)
-      .setAlpha(0.55)
+      .setAlpha(MotionParams.selectionGlowOpacity)
       .setTint(hexToNumber(this.indicatorColor));
 
     this.outlineGraphics = scene.add.graphics();
@@ -76,33 +77,40 @@ export class BottleSelectionIndicator extends Phaser.GameObjects.Container {
 
   public setSelectedVisible(visible: boolean, animate = true): this {
     if (this.shown === visible) {
+      if (!visible) {
+        this.stopAllTweens();
+        this.setVisible(false);
+        this.setAlpha(0);
+      }
       return this;
     }
 
     this.shown = visible;
     this.stopAllTweens();
 
-    const duration = animate
-      ? resolveMotionDuration(MotionDurations.Short, this.theme.reducedMotion)
-      : 0;
+    const baseDuration = visible
+      ? MotionDurations.BottleSelection
+      : MotionDurations.BottleDeselection;
+    const duration = animate ? resolveMotionDuration(baseDuration, this.theme.reducedMotion) : 0;
 
     if (visible) {
       this.setVisible(true);
       if (duration === 0) {
         this.setAlpha(1);
         this.setScale(1);
+        this.glowImage.setAlpha(MotionParams.selectionGlowOpacity);
         return this;
       }
 
       this.setAlpha(0);
-      this.setScale(0.92);
+      this.setScale(0.94);
       this.transitionTween = this.scene.tweens.add({
         targets: this,
         alpha: 1,
         scaleX: 1,
         scaleY: 1,
         duration,
-        ease: MotionEasings.EaseOutBack,
+        ease: MotionEasings.SoftOvershoot,
         onComplete: () => {
           this.transitionTween = undefined;
           this.startSubtlePulse();
@@ -113,6 +121,7 @@ export class BottleSelectionIndicator extends Phaser.GameObjects.Container {
 
     if (duration === 0) {
       this.setAlpha(0);
+      this.setScale(1);
       this.setVisible(false);
       return this;
     }
@@ -120,12 +129,13 @@ export class BottleSelectionIndicator extends Phaser.GameObjects.Container {
     this.transitionTween = this.scene.tweens.add({
       targets: this,
       alpha: 0,
-      scaleX: 0.94,
-      scaleY: 0.94,
-      duration: Math.round(duration * 0.8),
+      scaleX: 0.95,
+      scaleY: 0.95,
+      duration: Math.round(duration * 0.85),
       ease: MotionEasings.EaseInCubic,
       onComplete: () => {
         this.transitionTween = undefined;
+        this.setScale(1);
         this.setVisible(false);
       },
     });
@@ -156,12 +166,12 @@ export class BottleSelectionIndicator extends Phaser.GameObjects.Container {
     const r = Math.min(24, Math.round(w * 0.22));
 
     this.outlineGraphics.clear();
-    // Soft translucent halo tint (works identically in Canvas 2D and WebGL)
+    // Soft translucent halo tint + crisp high-contrast double outline for non-colour legibility
     this.outlineGraphics.fillStyle(color, 0.12);
     this.outlineGraphics.fillRoundedRect(-w / 2, -h / 2, w, h, r);
     this.outlineGraphics.lineStyle(6, color, 0.26);
     this.outlineGraphics.strokeRoundedRect(-w / 2, -h / 2, w, h, r);
-    this.outlineGraphics.lineStyle(2.5, color, 0.96);
+    this.outlineGraphics.lineStyle(2.5, color, 0.98);
     this.outlineGraphics.strokeRoundedRect(-w / 2, -h / 2, w, h, r);
   }
 
@@ -177,15 +187,16 @@ export class BottleSelectionIndicator extends Phaser.GameObjects.Container {
   private startSubtlePulse(): void {
     this.stopPulseTween();
     if (!this.shown || this.theme.reducedMotion) {
-      this.glowImage.setAlpha(1);
+      this.glowImage.setAlpha(MotionParams.selectionGlowOpacity);
       return;
     }
 
+    this.glowImage.setAlpha(MotionParams.selectionGlowOpacity);
     this.pulseTween = this.scene.tweens.add({
       targets: this.glowImage,
-      alpha: { from: 1, to: 0.78 },
-      duration: MotionDurations.Celebration,
-      ease: MotionEasings.EaseInOutCubic,
+      alpha: { from: MotionParams.selectionGlowOpacity, to: MotionParams.selectionGlowPulseMin },
+      duration: MotionDurations.VictoryCelebration,
+      ease: MotionEasings.EaseInOut,
       yoyo: true,
       repeat: -1,
     });
@@ -196,7 +207,7 @@ export class BottleSelectionIndicator extends Phaser.GameObjects.Container {
       this.pulseTween.stop();
       this.pulseTween = undefined;
     }
-    this.glowImage.setAlpha(1);
+    this.glowImage.setAlpha(MotionParams.selectionGlowOpacity);
   }
 
   private stopAllTweens(): void {

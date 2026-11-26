@@ -99,7 +99,7 @@ http://localhost:5173/?scene=game&difficulty=expert&seed=demo-2026
 
 ### Development Showcases (Development Only)
 
-While running `npm run dev`, two development-only inspection scenes are available (both gated behind `import.meta.env.DEV` dynamic imports and excluded from production builds):
+While running `npm run dev`, three development-only inspection scenes are available (all gated behind `import.meta.env.DEV` dynamic imports and excluded from production builds):
 
 #### Design System Component Showcase
 
@@ -122,6 +122,14 @@ Optional `?page=` values:
 - `/?scene=assets&page=states` — All 6 `BottleSprite` interaction states (`default`, `hovered`, `pressed`, `selected`, `swapping`, `disabled`)
 - `/?scene=assets&page=rack` — Interactive `BottleRack` & `HiddenSequenceRack` switcher (`3`, `4`, `5`, `6`, `8`, `10` bottles) plus empty/highlighted slot toggles
 
+#### Animation & Interaction Feedback Showcase
+
+```text
+http://localhost:5173/?scene=animations
+```
+
+Supports live previews for hover, press, select/deselect, adjacent/long-distance/cross-row curved swaps, dynamic shadows, match counter deltas (`+2`, `-1`, `No change`), move counter pulse, bounded sparkle/confetti bursts, victory celebration, modal transitions, plus **Reduced Motion** (`&reduced=1`) and **Slow Motion (0.35×)** (`&slow=1`) toggles.
+
 ### Production Build
 
 ```bash
@@ -138,5 +146,6 @@ The compiled bundle is emitted to `dist/` using relative asset paths (`./assets/
 - **Task 04 — Puzzle Generation Engine:** Complete.
 - **Task 05 — Bottle Swapping and Match Calculation:** Complete.
 - **Task 06 — Gameplay Screen and Engine Integration:** Complete.
+- **Task 07 — Animations and Interaction Feedback:** Complete.
 
-Advanced animations, audio, scoring, level progression, persistence, and YouTube Playables SDK integration are tracked in [docs/PROGRESS.md](./docs/PROGRESS.md).
+Audio, scoring, level progression, persistence, final screens, and YouTube Playables SDK integration are tracked in [docs/PROGRESS.md](./docs/PROGRESS.md).

@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { DefaultGameTheme, type GameTheme } from '../../theme/GameTheme';
 import { Colors } from '../../tokens/Colors';
 import { Dimens } from '../../tokens/Dimens';
-import { MotionPresets, resolveMotionDuration } from '../../tokens/Motion';
+import { MotionDurations, MotionEasings, resolveMotionDuration } from '../../tokens/Motion';
 import { SemanticShapes } from '../../tokens/Shapes';
 import { createTextStyle, Typography } from '../../tokens/Typography';
 import { drawIcon } from '../common/IconGraphic';
@@ -31,7 +31,8 @@ export class MatchCounter extends Phaser.GameObjects.Container {
   private readonly labelText: Phaser.GameObjects.Text;
   private readonly countText: Phaser.GameObjects.Text;
   private readonly progressBar: ProgressBar;
-  private pulseTween?: Phaser.Tweens.Tween;
+  private feedbackTween?: Phaser.Tweens.Tween;
+  private tintResetTimer?: Phaser.Time.TimerEvent;
 
   public constructor(scene: Phaser.Scene, config: MatchCounterConfig = {}) {
     super(scene, config.x ?? 0, config.y ?? 0);
@@ -110,8 +111,9 @@ export class MatchCounter extends Phaser.GameObjects.Container {
     this.countText.setText(next.formatted);
     this.layoutAndRedraw();
 
-    if (animate && (next.matched !== previous.matched || next.isComplete !== previous.isComplete)) {
-      this.playFeedbackPulse(next.isComplete);
+    const delta = next.matched - previous.matched;
+    if (animate && (delta !== 0 || next.isComplete !== previous.isComplete)) {
+      this.playDeltaFeedback(delta, next.isComplete);
     }
 
     return this;
@@ -131,6 +133,13 @@ export class MatchCounter extends Phaser.GameObjects.Container {
     return this;
   }
 
+  private getCountRestPosition(): { readonly x: number; readonly y: number } {
+    return {
+      x: this.counterWidth / 2 - Dimens.Space16,
+      y: -18,
+    };
+  }
+
   private layoutAndRedraw(): void {
     const isComplete = this.matchState.isComplete;
     const borderColor = isComplete ? Colors.Semantic.Success : Colors.Surface.Border;
@@ -148,8 +157,7 @@ export class MatchCounter extends Phaser.GameObjects.Container {
     });
 
     const leftEdge = -this.counterWidth / 2 + Dimens.Space16;
-    const rightEdge = this.counterWidth / 2 - Dimens.Space16;
-    const topRowY = -18;
+    const countRest = this.getCountRestPosition();
 
     this.badgeIconGraphics.clear();
     if (isComplete) {
@@ -157,58 +165,99 @@ export class MatchCounter extends Phaser.GameObjects.Container {
         this.badgeIconGraphics,
         'check',
         leftEdge + Dimens.Space10,
-        topRowY,
+        countRest.y,
         Dimens.IconSmall,
         Colors.Semantic.Success,
       );
-      this.labelText.setPosition(leftEdge + Dimens.Space24, topRowY);
+      this.labelText.setPosition(leftEdge + Dimens.Space24, countRest.y);
     } else {
-      this.labelText.setPosition(leftEdge, topRowY);
+      this.labelText.setPosition(leftEdge, countRest.y);
     }
 
     this.labelText.setColor(labelColor);
     this.countText.setColor(countColor);
-    this.countText.setPosition(rightEdge, topRowY);
+    this.countText.setPosition(countRest.x, countRest.y);
     this.progressBar.setPosition(0, 20);
   }
 
-  private playFeedbackPulse(isComplete: boolean): void {
-    if (this.pulseTween !== undefined) {
-      this.pulseTween.stop();
-      this.pulseTween = undefined;
-    }
+  private playDeltaFeedback(delta: number, isComplete: boolean): void {
+    this.stopFeedback();
+    const rest = this.getCountRestPosition();
+    this.countText.setScale(1);
+    this.countText.setPosition(rest.x, rest.y);
 
     const duration = resolveMotionDuration(
-      isComplete ? MotionPresets.SuccessFeedback.duration : MotionPresets.Selection.duration,
+      MotionDurations.MatchCounterFeedback,
       this.theme.reducedMotion,
     );
 
     if (duration === 0) {
-      this.countText.setScale(1);
       return;
     }
 
-    const peakScale = isComplete ? 1.18 : 1.09;
-    this.countText.setScale(1);
-    this.pulseTween = this.scene.tweens.add({
+    if (delta > 0 || isComplete) {
+      const peakScale = isComplete ? 1.16 : 1.1;
+      this.countText.setColor(Colors.Semantic.Success);
+      this.feedbackTween = this.scene.tweens.add({
+        targets: this.countText,
+        scaleX: peakScale,
+        scaleY: peakScale,
+        duration: Math.round(duration * 0.45),
+        yoyo: true,
+        ease: MotionEasings.SoftOvershoot,
+        onComplete: () => {
+          this.countText.setScale(1);
+          this.feedbackTween = undefined;
+        },
+      });
+
+      if (!isComplete) {
+        this.tintResetTimer = this.scene.time.delayedCall(duration + 120, () => {
+          this.countText.setColor(
+            this.matchState.isComplete ? Colors.Semantic.Success : Colors.Text.Primary,
+          );
+          this.tintResetTimer = undefined;
+        });
+      }
+      return;
+    }
+
+    // Restrained negative feedback: brief muted error colour + gentle 3px horizontal nudge
+    this.countText.setColor(Colors.Semantic.Error);
+    this.feedbackTween = this.scene.tweens.add({
       targets: this.countText,
-      scaleX: peakScale,
-      scaleY: peakScale,
-      duration: Math.round(duration * 0.45),
+      x: rest.x - 3,
+      duration: Math.round(duration * 0.28),
       yoyo: true,
-      ease: MotionPresets.SuccessFeedback.ease,
+      repeat: 1,
+      ease: MotionEasings.EaseInOut,
       onComplete: () => {
-        this.countText.setScale(1);
-        this.pulseTween = undefined;
+        this.countText.setPosition(rest.x, rest.y);
+        this.feedbackTween = undefined;
       },
+    });
+
+    this.tintResetTimer = this.scene.time.delayedCall(duration + 120, () => {
+      this.countText.setColor(
+        this.matchState.isComplete ? Colors.Semantic.Success : Colors.Text.Primary,
+      );
+      this.tintResetTimer = undefined;
     });
   }
 
-  public override destroy(fromScene?: boolean): void {
-    if (this.pulseTween !== undefined) {
-      this.pulseTween.stop();
-      this.pulseTween = undefined;
+  private stopFeedback(): void {
+    if (this.feedbackTween !== undefined) {
+      this.feedbackTween.stop();
+      this.feedbackTween = undefined;
     }
+    if (this.tintResetTimer !== undefined) {
+      this.tintResetTimer.remove(false);
+      this.tintResetTimer = undefined;
+    }
+  }
+
+  public override destroy(fromScene?: boolean): void {
+    this.stopFeedback();
     super.destroy(fromScene);
   }
 }

@@ -50,8 +50,11 @@ export class GameplayController {
   private returnToPauseOnCancel = false;
   private errorMessage: string | null = null;
 
+  private attemptId = 1;
+  private nextTransitionId = 1;
   private pendingSwap: PendingSwapTransition | null = null;
   private displayedMatchCount = 0;
+  private displayedMoveCount = 0;
   private focusedSlotIndex: number | null = null;
   private matchFeedback: MatchFeedbackView | null = null;
   private feedbackSequence = 0;
@@ -84,7 +87,9 @@ export class GameplayController {
     this.engine = createdEngine;
 
     if (this.engine !== null) {
-      this.displayedMatchCount = this.engine.getPublicState().currentMatchCount;
+      const pub = this.engine.getPublicState();
+      this.displayedMatchCount = pub.currentMatchCount;
+      this.displayedMoveCount = pub.moveCount;
     }
   }
 
@@ -96,6 +101,7 @@ export class GameplayController {
     const result = this.engine.start();
     if (result.accepted) {
       this.displayedMatchCount = result.publicState.currentMatchCount;
+      this.displayedMoveCount = result.publicState.moveCount;
       this.clock.start();
       this.lastFormattedTime = this.clock.getFormattedTime();
       this.callbacks.onEvents?.(result.events);
@@ -112,12 +118,14 @@ export class GameplayController {
     if (this.engine === null) {
       return Object.freeze({
         puzzleId: '',
+        attemptId: this.attemptId,
         headerTitle: this.headerTitle,
         headerSubtitle: this.headerSubtitle,
         currentSequence: Object.freeze([]),
         selectedSlotIndex: null,
         focusedSlotIndex: null,
         displayedMatchCount: 0,
+        displayedMoveCount: 0,
         totalBottleCount: 0,
         moveCount: 0,
         bestMatchCount: 0,
@@ -147,12 +155,14 @@ export class GameplayController {
 
     return Object.freeze({
       puzzleId: pub.puzzleId,
+      attemptId: this.attemptId,
       headerTitle: this.headerTitle,
       headerSubtitle: this.headerSubtitle,
       currentSequence: pub.currentSequence,
       selectedSlotIndex: pub.selectedSlotIndex,
       focusedSlotIndex: this.focusedSlotIndex,
       displayedMatchCount: this.displayedMatchCount,
+      displayedMoveCount: this.displayedMoveCount,
       totalBottleCount: pub.totalBottleCount,
       moveCount: pub.moveCount,
       bestMatchCount: pub.bestMatchCount,
@@ -186,7 +196,12 @@ export class GameplayController {
     const swapEvent = result.events.find((event) => event.type === 'BOTTLES_SWAPPED');
     if (swapEvent?.type === 'BOTTLES_SWAPPED') {
       const completedAfterSwap = result.events.some((event) => event.type === 'PUZZLE_COMPLETED');
+      const transitionId = this.nextTransitionId;
+      this.nextTransitionId += 1;
+
       this.pendingSwap = {
+        transitionId,
+        attemptId: this.attemptId,
         firstIndex: swapEvent.swap.firstIndex,
         secondIndex: swapEvent.swap.secondIndex,
         swap: swapEvent.swap,
@@ -204,12 +219,19 @@ export class GameplayController {
   }
 
   /**
-   * Called by the view once the visual swap tween completes (or immediately when
-   * interrupted by resize/pause/reduced motion) to synchronise HUD feedback and
+   * Called by the view once the visual swap transition completes (or immediately when
+   * interrupted by resize/pause/platform suspension) to synchronise HUD feedback and
    * trigger completion UI if the swap solved the puzzle.
+   *
+   * Passing an explicit transitionId prevents stale callbacks from superseded or
+   * previous-attempt transitions from affecting the current state.
    */
-  public completeSwapTransition(): GameplayViewState {
+  public completeSwapTransition(transitionId?: number): GameplayViewState {
     if (this.disposed || this.engine === null || this.pendingSwap === null) {
+      return this.getViewState();
+    }
+
+    if (transitionId !== undefined && this.pendingSwap.transitionId !== transitionId) {
       return this.getViewState();
     }
 
@@ -218,6 +240,7 @@ export class GameplayController {
 
     const pub = this.engine.getPublicState();
     this.displayedMatchCount = pub.currentMatchCount;
+    this.displayedMoveCount = pub.moveCount;
 
     const formatted = formatMatchDeltaFeedback(finished.swap.matchDelta);
     this.feedbackSequence += 1;
@@ -342,6 +365,7 @@ export class GameplayController {
       return this.getViewState();
     }
 
+    this.attemptId += 1;
     this.pendingSwap = null;
     this.matchFeedback = null;
     this.completionModalShown = false;
@@ -351,6 +375,7 @@ export class GameplayController {
     const result = this.engine.restart();
     if (result.accepted) {
       this.displayedMatchCount = result.publicState.currentMatchCount;
+      this.displayedMoveCount = result.publicState.moveCount;
       this.clock.reset(true);
       this.lastFormattedTime = this.clock.getFormattedTime();
       this.callbacks.onEvents?.(result.events);

@@ -104,9 +104,12 @@ Reference scale at `1280 × 720` (`src/design-system/tokens/Typography.ts`):
 
 ### Motion (`src/design-system/tokens/Motion.ts`)
 
-- Durations: `Instant (0ms)`, `Fast (100ms)`, `Short (150ms)`, `Normal (250ms)`, `Medium (350ms)`, `Long (500ms)`, `Celebration (800ms)`.
+- Base Durations: `Instant (0ms)`, `Fast (100ms)`, `Short (150ms)`, `Normal (250ms)`, `Medium (350ms)`, `Long (500ms)`, `Celebration (800ms)`.
+- Semantic Gameplay Durations (Task 07): `ButtonPress (100ms)`, `BottleHover (120ms)`, `BottleSelection (150ms)`, `BottleDeselection (150ms)`, `SwapAnticipation (70ms)`, `SwapMovement (300ms)`, `BottleLanding (100ms)`, `SwapTotal (470ms)`, `ReducedSwapMovement (110ms)`, `MatchCounterFeedback (250ms)`, `MoveCounterFeedback (150ms)`, `FloatingMatchFeedback (650ms)`, `ModalEntrance (250ms)`, `ModalDismissal (150ms)`, `VictoryCelebration (800ms)`.
+- Easings: `Linear`, `EaseOut` (`Cubic.easeOut`), `EaseInOut` (`Cubic.easeInOut`), `SoftOvershoot` (`Back.easeOut`), `GentleSettle` (`Sine.easeOut`), plus quad/cubic/back variants.
+- Relative Parameters (`MotionParams`): proportional bottle hover/selection/anticipation elevations, max tilt radians, quadratic Bezier arc ratios, landing squash/stretch (`1.05 × 0.94`), glow opacities, particle lifetimes, floating feedback displacement, and modal scale endpoints (`0.96 -> 1.00`).
 - Presets: `ButtonPress`, `ButtonRelease`, `Hover`, `Selection`, `FadeIn`, `FadeOut`, `ScaleIn`, `ModalEntrance`, `ModalDismissal`, `SuccessFeedback`, `ErrorFeedback`.
-- Reduced motion: `resolveMotionDuration(duration, theme.reducedMotion)` collapses transitions to `0ms` when `GameTheme.reducedMotion` is enabled. Every animated component stops and disposes active tweens on `destroy()`.
+- Reduced motion: `resolveMotionDuration(duration, theme.reducedMotion)` and `resolveAnimationPolicy()` collapse decorative motion while preserving essential state feedback. Every animated component stops and disposes active tweens on `destroy()`. See [docs/ANIMATIONS.md](./ANIMATIONS.md).
 
 ---
 

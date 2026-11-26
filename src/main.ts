@@ -85,6 +85,18 @@ async function bootstrap(): Promise<void> {
         new GameScene(platform),
         new AssetShowcaseScene(platform, initialPage),
       );
+    } else if (requestedScene === 'animations') {
+      const { AnimationShowcaseScene } = await import('./game/scenes/AnimationShowcaseScene');
+      initialSceneKey = SCENE_KEYS.ANIMATION_SHOWCASE;
+      scenes.push(
+        new BootScene(platform, initialSceneKey),
+        new HomeScene(platform),
+        new GameScene(platform),
+        new AnimationShowcaseScene(platform, {
+          reducedMotion: params.get('reduced') === '1',
+          slowMotion: params.get('slow') === '1',
+        }),
+      );
     } else if (requestedScene === 'game') {
       const diffParam = params.get('difficulty');
       const seedParam = params.get('seed');

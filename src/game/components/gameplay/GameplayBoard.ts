@@ -1,12 +1,12 @@
 import Phaser from 'phaser';
 import type { BottleId } from '../../../core';
+import { DefaultGameTheme, type GameTheme } from '../../../design-system';
+import { playBottleSwapAnimation } from '../../animations/bottle/BottleSwapAnimation';
 import {
-  DefaultGameTheme,
-  MotionEasings,
-  resolveMotionDuration,
-  type GameTheme,
-} from '../../../design-system';
-import { GAMEPLAY_CONFIG } from '../../../config/GameplayConfig';
+  resolveAnimationPolicy,
+  type AnimationPolicy,
+} from '../../animations/core/AnimationPolicy';
+import type { SafeTrajectoryBounds } from '../../animations/utils/AnimationCurves';
 import type { GameplayBoardLayout } from '../../layout/GameplayLayout';
 import { BottleSprite } from '../bottles/BottleSprite';
 import { BottleRack } from '../environment/BottleRack';
@@ -17,6 +17,8 @@ export interface GameplayBoardConfig {
   readonly layout: GameplayBoardLayout;
   readonly onSlotTap: (slotIndex: number) => void;
   readonly theme?: GameTheme;
+  readonly policy?: AnimationPolicy;
+  readonly safeBounds?: SafeTrajectoryBounds;
 }
 
 /**
@@ -25,6 +27,8 @@ export interface GameplayBoardConfig {
  */
 export class GameplayBoard extends Phaser.GameObjects.Container {
   private theme: GameTheme;
+  private policy: AnimationPolicy;
+  private safeBounds?: SafeTrajectoryBounds;
   private readonly onSlotTap: (slotIndex: number) => void;
 
   private readonly hiddenRack: HiddenSequenceRack;
@@ -33,12 +37,14 @@ export class GameplayBoard extends Phaser.GameObjects.Container {
 
   private readonly spritesById = new Map<BottleId, BottleSprite>();
   private currentSequence: readonly BottleId[];
-  private activeSwapTweens: Phaser.Tweens.Tween[] = [];
+  private cancelSwapAnimation?: () => void;
 
   public constructor(scene: Phaser.Scene, config: GameplayBoardConfig) {
     super(scene, 0, 0);
 
     this.theme = config.theme ?? DefaultGameTheme;
+    this.policy = config.policy ?? resolveAnimationPolicy(this.theme.reducedMotion);
+    this.safeBounds = config.safeBounds;
     this.onSlotTap = config.onSlotTap;
     this.currentSequence = [...config.initialSequence];
 
@@ -69,13 +75,16 @@ export class GameplayBoard extends Phaser.GameObjects.Container {
     this.add([this.hiddenRack, this.rack, this.bottlesLayer]);
 
     this.createBottleSprites(config.initialSequence);
-    this.applyLayout(config.layout);
+    this.applyLayout(config.layout, config.safeBounds);
 
     scene.add.existing(this);
   }
 
-  public applyLayout(layout: GameplayBoardLayout): this {
+  public applyLayout(layout: GameplayBoardLayout, safeBounds?: SafeTrajectoryBounds): this {
     this.stopSwapTweens();
+    if (safeBounds !== undefined) {
+      this.safeBounds = safeBounds;
+    }
 
     this.rack.setPosition(layout.rackX, layout.rackY);
     this.rack.resize(
@@ -96,6 +105,21 @@ export class GameplayBoard extends Phaser.GameObjects.Container {
 
     this.reconcileBottlePositions(this.currentSequence);
     return this;
+  }
+
+  public getRackVisualBounds(): {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+  } {
+    const rackLayout = this.rack.getLayout();
+    return {
+      x: this.x + this.rack.x,
+      y: this.y + this.rack.y,
+      width: rackLayout.rackWidth,
+      height: rackLayout.rackHeight,
+    };
   }
 
   public syncState(
@@ -134,79 +158,62 @@ export class GameplayBoard extends Phaser.GameObjects.Container {
   }
 
   /**
-   * Animates the two swapped bottles between their logical slot positions using
-   * lightweight position tweens, then reconciles cleanly with authoritative state.
+   * Animates the two swapped bottles using the multi-stage curved swap animation
+   * (Anticipation -> Opposing Quadratic Bezier Movement -> Landing Squash & Settle),
+   * returning a cancellation callback for safe interruption.
    */
   public animateSwap(
     firstIndex: number,
     secondIndex: number,
     nextSequence: readonly BottleId[],
     onComplete: () => void,
-  ): this {
+  ): () => void {
     this.stopSwapTweens();
     this.currentSequence = [...nextSequence];
 
     // After the swap in nextSequence, the bottle now at firstIndex came from secondIndex and vice versa
     const movedToFirstId = nextSequence[firstIndex];
     const movedToSecondId = nextSequence[secondIndex];
-    const spriteA = movedToFirstId !== undefined ? this.spritesById.get(movedToFirstId) : undefined;
-    const spriteB =
+    const spriteMovingToFirst =
+      movedToFirstId !== undefined ? this.spritesById.get(movedToFirstId) : undefined;
+    const spriteMovingToSecond =
       movedToSecondId !== undefined ? this.spritesById.get(movedToSecondId) : undefined;
 
-    const targetPosA = this.rack.getSlotWorldPosition(firstIndex);
-    const targetPosB = this.rack.getSlotWorldPosition(secondIndex);
+    const slotFirstPos = this.rack.getSlotWorldPosition(firstIndex);
+    const slotSecondPos = this.rack.getSlotWorldPosition(secondIndex);
 
-    const duration = resolveMotionDuration(
-      GAMEPLAY_CONFIG.swapTransitionDurationMs,
-      this.theme.reducedMotion,
-    );
-
-    if (duration === 0 || spriteA === undefined || spriteB === undefined) {
+    if (spriteMovingToFirst === undefined || spriteMovingToSecond === undefined) {
       this.reconcileBottlePositions(nextSequence);
       onComplete();
-      return this;
+      return () => undefined;
     }
 
-    spriteA.setSelected(false, false);
-    spriteB.setSelected(false, false);
-    spriteA.setSwapping(true, true, true);
-    spriteB.setSwapping(true, true, true);
-    this.bottlesLayer.bringToTop(spriteA);
-    this.bottlesLayer.bringToTop(spriteB);
+    // spriteMovingToSecond starts at firstIndex -> goes to secondIndex
+    // spriteMovingToFirst starts at secondIndex -> goes to firstIndex
+    const cancel = playBottleSwapAnimation({
+      scene: this.scene,
+      spriteA: spriteMovingToSecond,
+      spriteB: spriteMovingToFirst,
+      fromA: slotFirstPos,
+      fromB: slotSecondPos,
+      bottlesLayer: this.bottlesLayer,
+      policy: this.policy,
+      ...(this.safeBounds !== undefined ? { bounds: this.safeBounds } : {}),
+      onComplete: () => {
+        this.cancelSwapAnimation = undefined;
+        this.reconcileBottlePositions(this.currentSequence);
+        onComplete();
+      },
+    });
 
-    let finishedCount = 0;
-    const handleOneComplete = (): void => {
-      finishedCount += 1;
-      if (finishedCount < 2) {
-        return;
+    this.cancelSwapAnimation = cancel;
+    return () => {
+      if (this.cancelSwapAnimation === cancel) {
+        this.cancelSwapAnimation = undefined;
       }
-      this.activeSwapTweens = [];
-      spriteA.setSwapping(false, true, true);
-      spriteB.setSwapping(false, true, true);
+      cancel();
       this.reconcileBottlePositions(this.currentSequence);
-      onComplete();
     };
-
-    this.activeSwapTweens.push(
-      this.scene.tweens.add({
-        targets: spriteA,
-        x: targetPosA.x,
-        y: targetPosA.y,
-        duration,
-        ease: MotionEasings.EaseInOutCubic,
-        onComplete: handleOneComplete,
-      }),
-      this.scene.tweens.add({
-        targets: spriteB,
-        x: targetPosB.x,
-        y: targetPosB.y,
-        duration,
-        ease: MotionEasings.EaseInOutCubic,
-        onComplete: handleOneComplete,
-      }),
-    );
-
-    return this;
   }
 
   public reconcileImmediate(sequence: readonly BottleId[]): this {
@@ -216,8 +223,14 @@ export class GameplayBoard extends Phaser.GameObjects.Container {
     return this;
   }
 
+  public setPolicy(policy: AnimationPolicy): this {
+    this.policy = policy;
+    return this;
+  }
+
   public setTheme(theme: GameTheme): this {
     this.theme = theme;
+    this.policy = resolveAnimationPolicy(theme.reducedMotion, this.policy.timeScale);
     this.hiddenRack.setTheme(theme);
     for (const sprite of this.spritesById.values()) {
       sprite.setTheme(theme);
@@ -269,19 +282,17 @@ export class GameplayBoard extends Phaser.GameObjects.Container {
         continue;
       }
       const pos = this.rack.getSlotWorldPosition(slotIndex);
-      sprite.setSwapping(false, true, false);
+      sprite.resetVisualTransform();
       sprite.setDisplayDimensions(rackLayout.bottleWidth, rackLayout.bottleHeight);
       sprite.setPosition(pos.x, pos.y);
     }
   }
 
   private stopSwapTweens(): void {
-    for (const tween of this.activeSwapTweens) {
-      tween.stop();
-    }
-    this.activeSwapTweens = [];
-    for (const sprite of this.spritesById.values()) {
-      sprite.setSwapping(false, true, false);
+    if (this.cancelSwapAnimation !== undefined) {
+      const cancel = this.cancelSwapAnimation;
+      this.cancelSwapAnimation = undefined;
+      cancel();
     }
   }
 

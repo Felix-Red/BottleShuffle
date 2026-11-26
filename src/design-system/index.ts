@@ -43,6 +43,7 @@ export {
   Motion,
   MotionDurations,
   MotionEasings,
+  MotionParams,
   MotionPresets,
   resolveMotionDuration,
   type MotionSpec,
