@@ -72,11 +72,16 @@ describe('PuzzleGenerator', () => {
     expect('seed' in publicView).toBe(false);
     expect(publicView.startingSequence).toEqual(puzzle.startingSequence);
 
+    const diag = inspectPuzzleDiagnostics(puzzle);
     const initialState = createInitialPuzzleState(puzzle);
     expect(initialState).toEqual({
       puzzleId: puzzle.id,
       currentSequence: puzzle.startingSequence,
+      selectedSlotIndex: null,
       moveCount: 0,
+      currentMatchCount: diag.initialMatchCount,
+      bestMatchCount: diag.initialMatchCount,
+      lastSwap: null,
       status: 'ready',
     });
     expect(Object.isFrozen(initialState.currentSequence)).toBe(true);

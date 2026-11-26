@@ -58,9 +58,25 @@ This document tracks completed milestones, technical notes, and planned upcoming
 - **Non-cryptographic PRNG:** Mulberry32 + FNV-1a is intended for reproducible game puzzles, not cryptographic security; because the game is client-side, target sequences are protected against accidental UI leakage rather than browser DevTools inspection.
 - **No gameplay loop yet:** Bottle swapping state transitions, timers, move history, scoring, level unlocking, and gameplay scene wiring are intentionally deferred to Task 05+.
 
+### Task 05: Bottle Swapping and Match Calculation — Completed
+
+- Extended pure TypeScript gameplay domain in `src/core/` with zero Phaser, browser, or platform dependencies:
+  - Extended `PuzzleState` with `selectedSlotIndex`, `currentMatchCount`, `bestMatchCount`, and `lastSwap` (all immutable and accurately derived from the puzzle's starting vs target sequences).
+  - Added `PublicGameState` (`toPublicGameState`), `SwapResult`, discriminated `GameAction` union (7 actions), typed `GameEvent` union (9 events), `GameTransitionResult`, and structured `ActionRejectionReason` / `GameError`.
+  - Implemented pure `MatchCalculator` (reusing Task 04's `countMatchingPositions`), `BottleSwapper` (`swapBottles`), and non-throwing `SwapValidator`.
+  - Implemented `GameStateFactory`, single authoritative `GameReducer` (unifying tap-to-swap `SELECT_BOTTLE` and direct `SWAP_BOTTLES`, full `ready | playing | paused | completed` transition rules, deterministic `[BOTTLES_SWAPPED, PUZZLE_COMPLETED]` event ordering), and `GameEngine` session orchestrator with private validated `Puzzle` retention.
+- Added development-only gameplay diagnostics CLI (`npm run gameplay:simulate`, `scripts/simulate-gameplay.mjs`).
+- Added 6 new core unit & integration test suites (`MatchCalculator`, `BottleSwapper`, `SwapValidator`, `GameStateFactory`, `GameReducer`, `GameEngine`), including programmatic solving of 60 deterministic puzzles across all 6 difficulties.
+- Authored `docs/GAMEPLAY_ENGINE.md` and updated `README.md` and `docs/PROGRESS.md`.
+
+#### Known Limitations & Assumptions (Task 05)
+
+- **Client-side boundary:** Isolating `targetSequence` inside `GameEngine` prevents accidental disclosure through UI contracts, not browser DevTools inspection.
+- **Deferred features:** Visual gameplay scene, swap animations, timers, scoring/stars, level unlocking, undo, persistence, audio, and YouTube Playables SDK integration remain deferred to subsequent tasks.
+
 ## Upcoming Tasks (Planned)
 
-- **Gameplay State & Swap Controller (`src/core/` & `src/game/`):** Immutable swap transitions, match feedback evaluation, move tracking, and win detection wired into an interactive gameplay scene.
+- **Interactive Gameplay Scene & Animations (`src/game/`):** Wiring `GameEngine` to `BottleRack`, `BottleSprite`, `HiddenSequenceRack`, `MatchCounter`, animated bottle swaps, and input locking during transitions.
 - **Level & Difficulty Progression:** Level definitions, bottle counts, scoring/move tracking, and persistence service built on `GamePlatform`.
 - **Interactive Gameplay Scene:** Wiring `BottleRack`, `BottleSprite`, `HiddenSequenceRack`, `MatchCounter`, swap animations, and input handling to `src/core/`.
 - **Audio System:** Local SFX/music playback respecting `GamePlatform` audio preferences and pause/resume lifecycle events.
