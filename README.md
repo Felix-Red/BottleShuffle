@@ -62,19 +62,20 @@ npm install
 
 ### Development Commands
 
-| Command                                                       | Description                                                 |
-| ------------------------------------------------------------- | ----------------------------------------------------------- |
-| `npm run dev`                                                 | Start the Vite development server                           |
-| `npm run typecheck`                                           | Run strict TypeScript type checking (`tsc --noEmit`)        |
-| `npm run lint`                                                | Run ESLint across the codebase                              |
-| `npm run lint:fix`                                            | Automatically fix fixable ESLint issues                     |
-| `npm run format`                                              | Format files with Prettier                                  |
-| `npm run format:check`                                        | Verify formatting with Prettier                             |
-| `npm test`                                                    | Run unit tests once via Vitest                              |
-| `npm run test:watch`                                          | Run Vitest in watch mode                                    |
-| `npm run build`                                               | Type-check and create a production build in `dist/`         |
-| `npm run preview`                                             | Preview the production build locally                        |
-| `npm run puzzle:inspect -- --difficulty expert --seed demo-1` | Inspect a deterministically generated puzzle in development |
+| Command                                                                        | Description                                                 |
+| ------------------------------------------------------------------------------ | ----------------------------------------------------------- |
+| `npm run dev`                                                                  | Start the Vite development server                           |
+| `npm run typecheck`                                                            | Run strict TypeScript type checking (`tsc --noEmit`)        |
+| `npm run lint`                                                                 | Run ESLint across the codebase                              |
+| `npm run lint:fix`                                                             | Automatically fix fixable ESLint issues                     |
+| `npm run format`                                                               | Format files with Prettier                                  |
+| `npm run format:check`                                                         | Verify formatting with Prettier                             |
+| `npm test`                                                                     | Run unit tests once via Vitest                              |
+| `npm run test:watch`                                                           | Run Vitest in watch mode                                    |
+| `npm run build`                                                                | Type-check and create a production build in `dist/`         |
+| `npm run preview`                                                              | Preview the production build locally                        |
+| `npm run puzzle:inspect -- --difficulty expert --seed demo-1`                  | Inspect a deterministically generated puzzle in development |
+| `npm run gameplay:simulate -- --difficulty normal --seed demo --reveal-target` | Simulate a full gameplay engine session in development      |
 
 ### Development Showcases (Development Only)
 
@@ -115,5 +116,6 @@ The compiled bundle is emitted to `dist/` using relative asset paths (`./assets/
 - **Task 02 — Design System and Reusable Components:** Complete.
 - **Task 03 — Bottle Assets and Visual Environment:** Complete.
 - **Task 04 — Puzzle Generation Engine:** Complete.
+- **Task 05 — Bottle Swapping and Match Calculation:** Complete.
 
-Gameplay swapping mechanics, scoring, level progression, audio, and YouTube Playables SDK integration are tracked in [docs/PROGRESS.md](./docs/PROGRESS.md).
+Interactive gameplay scene, swap animations, scoring, level progression, audio, and YouTube Playables SDK integration are tracked in [docs/PROGRESS.md](./docs/PROGRESS.md).

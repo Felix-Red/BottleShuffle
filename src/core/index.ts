@@ -1,5 +1,6 @@
 // Errors
 export { PuzzleError, type PuzzleErrorCode } from './errors/PuzzleError';
+export { GameError, type ActionRejectionReason, type GameErrorCode } from './errors/GameError';
 
 // Models
 export {
@@ -15,6 +16,10 @@ export type { PuzzleConfig, PuzzleSeedInput, ResolvedPuzzleConfig } from './mode
 export { toPublicPuzzleView, type PublicPuzzleView, type Puzzle } from './models/Puzzle';
 export { PUZZLE_STATUSES, type PuzzleStatus } from './models/PuzzleStatus';
 export { createInitialPuzzleState, type PuzzleState } from './models/PuzzleState';
+export { toPublicGameState, type PublicGameState } from './models/PublicGameState';
+export type { SwapResult } from './models/SwapResult';
+export type { GameAction, GameActionType } from './models/GameAction';
+export type { GameEvent, GameTransitionResult } from './models/GameEvent';
 
 // Difficulty definitions
 export {
@@ -36,7 +41,7 @@ export {
 } from './random/SeededRandom';
 export { shuffle } from './random/Shuffle';
 
-// Engine
+// Engine — puzzle generation & validation
 export { calculateMinimumSwapDistance, countMatchingPositions } from './engine/SwapDistance';
 export {
   assertValidPuzzle,
@@ -62,3 +67,17 @@ export {
   type PuzzleDiagnostics,
   type PuzzleGeneratorOptions,
 } from './engine/PuzzleGenerator';
+
+// Engine — gameplay mechanics & session orchestration
+export { calculateCorrectMatches, isSequenceSolved } from './engine/MatchCalculator';
+export { swapBottles } from './engine/BottleSwapper';
+export {
+  validatePlayingStatus,
+  validateSelectionRequest,
+  validateSlotIndex,
+  validateSwapRequest,
+  type ValidationOutcome,
+} from './engine/SwapValidator';
+export { createReadyGameState, createRestartedGameState } from './state/GameStateFactory';
+export { reduceGameState } from './state/GameReducer';
+export { GameEngine } from './engine/GameEngine';

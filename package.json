@@ -15,7 +15,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "puzzle:inspect": "node scripts/inspect-puzzle.mjs"
+    "puzzle:inspect": "node scripts/inspect-puzzle.mjs",
+    "gameplay:simulate": "node scripts/simulate-gameplay.mjs"
   },
   "dependencies": {
     "phaser": "^3.90.0"
