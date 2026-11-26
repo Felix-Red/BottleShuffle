@@ -2,8 +2,8 @@ import Phaser from 'phaser';
 import {
   Colors,
   ConfirmDialog,
+  createGameTheme,
   createTextStyle,
-  DefaultGameTheme,
   Dimens,
   Modal,
   TextButton,
@@ -12,6 +12,11 @@ import {
 } from '../../design-system';
 import { GAMEPLAY_CONFIG, GAMEPLAY_COPY } from '../../config/GameplayConfig';
 import type { GamePlatform, Unsubscribe } from '../../platform/contracts/GamePlatform';
+import { MotionPreferenceService } from '../../services/MotionPreferenceService';
+import { playVictoryCelebration } from '../animations/celebration/VictoryCelebration';
+import { AnimationCoordinator } from '../animations/core/AnimationCoordinator';
+import { resolveAnimationPolicy, type AnimationPolicy } from '../animations/core/AnimationPolicy';
+import type { SafeTrajectoryBounds } from '../animations/utils/AnimationCurves';
 import { GameBackground } from '../components/environment/GameBackground';
 import { GameplayBoard } from '../components/gameplay/GameplayBoard';
 import { GameplayHeader } from '../components/gameplay/GameplayHeader';
@@ -24,13 +29,18 @@ import type {
   GameplayViewState,
   PendingSwapTransition,
 } from '../gameplay/GameplayViewState';
-import { calculateGameplayLayout } from '../layout/GameplayLayout';
+import { calculateGameplayLayout, type GameplayLayout } from '../layout/GameplayLayout';
 import { SCENE_KEYS } from './sceneKeys';
 
 export class GameScene extends Phaser.Scene {
   private readonly platform: GamePlatform;
-  private readonly theme: GameTheme = DefaultGameTheme;
+  private theme: GameTheme = createGameTheme();
+  private policy: AnimationPolicy = resolveAnimationPolicy(false);
   private launchData?: GameplaySceneData;
+
+  private motionPreference?: MotionPreferenceService;
+  private unsubscribeMotionPreference?: Unsubscribe;
+  private coordinator?: AnimationCoordinator;
 
   private controller?: GameplayController;
   private background?: GameBackground;
@@ -50,6 +60,7 @@ export class GameScene extends Phaser.Scene {
   private unsubscribePlatformPause?: Unsubscribe;
   private unsubscribePlatformResume?: Unsubscribe;
   private activeOverlayMode: GameplayOverlayMode = 'none';
+  private lastAttemptId = 1;
 
   public constructor(platform: GamePlatform, defaultLaunchData?: GameplaySceneData) {
     super({ key: SCENE_KEYS.GAME });
@@ -65,6 +76,12 @@ export class GameScene extends Phaser.Scene {
 
   public create(): void {
     this.activeOverlayMode = 'none';
+    this.motionPreference = new MotionPreferenceService();
+    const initialReducedMotion = this.motionPreference.isReducedMotion();
+    this.theme = createGameTheme({ reducedMotion: initialReducedMotion });
+    this.policy = resolveAnimationPolicy(initialReducedMotion);
+    this.coordinator = new AnimationCoordinator();
+
     this.background = new GameBackground(this, { depth: -10 });
 
     this.outsideTapZone = this.add
@@ -87,6 +104,8 @@ export class GameScene extends Phaser.Scene {
     });
 
     const initialView = this.controller.getViewState();
+    this.lastAttemptId = initialView.attemptId;
+
     if (initialView.overlayMode === 'error') {
       this.showErrorRecoveryModal(
         initialView.errorMessage ?? GAMEPLAY_COPY.errorRecovery.fallbackMessage,
@@ -106,9 +125,11 @@ export class GameScene extends Phaser.Scene {
       title: initialView.headerTitle,
       subtitle: initialView.headerSubtitle,
       onPause: () => {
+        this.interruptActiveSwapAndReconcile();
         this.controller?.requestPause();
       },
       onRestart: () => {
+        this.interruptActiveSwapAndReconcile();
         this.controller?.requestRestartConfirmation();
       },
       theme: this.theme,
@@ -117,18 +138,21 @@ export class GameScene extends Phaser.Scene {
     this.hud = new GameplayHUD(this, {
       initialMatches: initialView.displayedMatchCount,
       totalBottles: initialView.totalBottleCount,
-      initialMoves: initialView.moveCount,
+      initialMoves: initialView.displayedMoveCount,
       initialTime: initialView.formattedTime,
       theme: this.theme,
+      policy: this.policy,
     });
 
     this.board = new GameplayBoard(this, {
       initialSequence: initialView.currentSequence,
       layout: layout.board,
+      safeBounds: this.computeSafeSwapBounds(layout),
       onSlotTap: (slotIndex) => {
         this.controller?.handleBottleTap(slotIndex);
       },
       theme: this.theme,
+      policy: this.policy,
     });
 
     this.instructions = new GameplayInstructions(this, initialView.instructionText);
@@ -196,6 +220,8 @@ export class GameScene extends Phaser.Scene {
       dismissible: true,
       theme: this.theme,
       onConfirm: () => {
+        this.coordinator?.resetAttempt();
+        this.hud?.clearFeedback();
         this.controller?.confirmRestart();
       },
       onCancel: () => {
@@ -228,6 +254,8 @@ export class GameScene extends Phaser.Scene {
         label: GAMEPLAY_COPY.completionModal.playAgainLabel,
         closeOnClick: false,
         onClick: () => {
+          this.coordinator?.resetAttempt();
+          this.hud?.clearFeedback();
           this.controller?.confirmRestart();
         },
       },
@@ -260,13 +288,20 @@ export class GameScene extends Phaser.Scene {
   }
 
   private renderViewState(viewState: GameplayViewState): void {
+    // Detect attempt reset (restart) so stale decorative effects & animations clear cleanly
+    if (viewState.attemptId !== this.lastAttemptId) {
+      this.lastAttemptId = viewState.attemptId;
+      this.coordinator?.resetAttempt();
+      this.hud?.clearFeedback();
+    }
+
     this.header?.setControlsEnabled(
       viewState.status === 'playing' && viewState.overlayMode === 'none',
       viewState.overlayMode !== 'error',
     );
 
     this.hud?.setMatches(viewState.displayedMatchCount, viewState.totalBottleCount, true);
-    this.hud?.setMoveCount(viewState.moveCount);
+    this.hud?.setMoveCount(viewState.displayedMoveCount, true);
     this.hud?.setElapsedTime(viewState.formattedTime);
     this.hud?.showMatchFeedback(viewState.matchFeedback);
 
@@ -310,29 +345,84 @@ export class GameScene extends Phaser.Scene {
     } else if (viewState.overlayMode === 'restart_confirm') {
       this.restartDialog?.open();
     } else if (viewState.overlayMode === 'completed') {
+      this.triggerCompletionCelebrationAndOverlay(viewState);
+    }
+  }
+
+  private triggerCompletionCelebrationAndOverlay(viewState: GameplayViewState): void {
+    const attemptAtTrigger = viewState.attemptId;
+    const openCompletionModal = (): void => {
+      const current = this.controller?.getViewState();
+      if (current?.attemptId !== attemptAtTrigger || current.overlayMode !== 'completed') {
+        return;
+      }
       this.completionStatsText?.setText(
-        `Matches: ${String(viewState.displayedMatchCount)}/${String(viewState.totalBottleCount)}\nMoves: ${String(viewState.moveCount)}   ·   Time: ${viewState.formattedTime}`,
+        `Matches: ${String(current.displayedMatchCount)}/${String(current.totalBottleCount)}\nMoves: ${String(current.moveCount)}   ·   Time: ${current.formattedTime}`,
       );
       this.completionModal?.resize(this.scale.width, this.scale.height);
       this.completionModal?.open();
+    };
+
+    if (this.board === undefined || this.hud === undefined || this.coordinator === undefined) {
+      openCompletionModal();
+      return;
     }
+
+    let stopCelebration: () => void = () => undefined;
+    const { finish } = this.coordinator.registerDecorative(() => {
+      stopCelebration();
+    });
+
+    stopCelebration = playVictoryCelebration({
+      scene: this,
+      rackBounds: this.board.getRackVisualBounds(),
+      matchCounterPosition: this.hud.getMatchCounterPosition(),
+      policy: this.policy,
+      onReadyForOverlay: openCompletionModal,
+      onComplete: finish,
+    });
   }
 
   private handleSwapStarted(transition: PendingSwapTransition): void {
     const view = this.controller?.getViewState();
-    if (view === undefined || this.board === undefined) {
-      this.controller?.completeSwapTransition();
+    if (view === undefined || this.board === undefined || this.coordinator === undefined) {
+      this.controller?.completeSwapTransition(transition.transitionId);
       return;
     }
 
-    this.board.animateSwap(
-      transition.firstIndex,
-      transition.secondIndex,
-      view.currentSequence,
+    const board = this.board;
+    this.coordinator.beginSwap(
+      (token) =>
+        board.animateSwap(
+          transition.firstIndex,
+          transition.secondIndex,
+          view.currentSequence,
+          () => {
+            token.complete();
+          },
+        ),
       () => {
-        this.controller?.completeSwapTransition();
+        this.controller?.completeSwapTransition(transition.transitionId);
       },
     );
+  }
+
+  private interruptActiveSwapAndReconcile(): void {
+    const cancelled = this.coordinator?.cancelActiveSwap() ?? false;
+    if (cancelled || this.controller?.getViewState().isSwapping) {
+      this.controller?.completeSwapTransition();
+    }
+  }
+
+  private computeSafeSwapBounds(layout: GameplayLayout): SafeTrajectoryBounds {
+    const hudBottom = layout.hud.topY + layout.hud.height;
+    const instructionsTop = layout.instructions.y - layout.instructions.height / 2;
+    return {
+      minX: Dimens.Space16,
+      maxX: Math.max(Dimens.Space32, layout.width - Dimens.Space16),
+      minY: hudBottom + Dimens.Space4,
+      maxY: Math.max(hudBottom + 120, instructionsTop - Dimens.Space4),
+    };
   }
 
   private applyResponsiveLayout(width: number, height: number): void {
@@ -352,7 +442,7 @@ export class GameScene extends Phaser.Scene {
 
       this.header?.applyLayout(layout.header);
       this.hud?.applyLayout(layout.hud);
-      this.board?.applyLayout(layout.board);
+      this.board?.applyLayout(layout.board, this.computeSafeSwapBounds(layout));
       this.instructions?.applyLayout(layout.instructions);
     }
 
@@ -362,12 +452,29 @@ export class GameScene extends Phaser.Scene {
     this.errorModal?.resize(safeW, safeH);
   }
 
+  private applyMotionPreference(reducedMotion: boolean): void {
+    this.interruptActiveSwapAndReconcile();
+    this.theme = createGameTheme({ reducedMotion });
+    this.policy = resolveAnimationPolicy(reducedMotion);
+
+    this.header?.setTheme(this.theme);
+    this.hud?.setTheme(this.theme);
+    this.hud?.setPolicy(this.policy);
+    this.board?.setTheme(this.theme);
+    this.board?.setPolicy(this.policy);
+    this.pauseModal?.setTheme(this.theme);
+    this.restartDialog?.setTheme(this.theme);
+    this.completionModal?.setTheme(this.theme);
+    this.errorModal?.setTheme(this.theme);
+  }
+
   private bindSceneLifecycle(): void {
     this.scale.on(Phaser.Scale.Events.RESIZE, this.handleResize);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.handleShutdown);
 
     this.unsubscribePlatformPause = this.platform.onPause(this.handlePlatformPause);
     this.unsubscribePlatformResume = this.platform.onResume(this.handlePlatformResume);
+    this.unsubscribeMotionPreference = this.motionPreference?.onChange(this.handleMotionChange);
 
     if (typeof globalThis.window !== 'undefined') {
       globalThis.window.addEventListener('blur', this.handleWindowBlur);
@@ -375,6 +482,10 @@ export class GameScene extends Phaser.Scene {
       globalThis.window.addEventListener('keydown', this.handleKeyDown);
     }
   }
+
+  private readonly handleMotionChange = (reducedMotion: boolean): void => {
+    this.applyMotionPreference(reducedMotion);
+  };
 
   private readonly handleOutsideTap = (): void => {
     this.controller?.clearSelection();
@@ -388,13 +499,12 @@ export class GameScene extends Phaser.Scene {
   };
 
   private readonly handleResize = (gameSize: Phaser.Structs.Size): void => {
-    if (this.controller?.getViewState().isSwapping) {
-      this.controller.completeSwapTransition();
-    }
+    this.interruptActiveSwapAndReconcile();
     this.applyResponsiveLayout(gameSize.width, gameSize.height);
   };
 
   private readonly handlePlatformPause = (): void => {
+    this.interruptActiveSwapAndReconcile();
     this.controller?.handlePlatformSuspend();
   };
 
@@ -403,6 +513,7 @@ export class GameScene extends Phaser.Scene {
   };
 
   private readonly handleWindowBlur = (): void => {
+    this.interruptActiveSwapAndReconcile();
     this.controller?.handlePlatformSuspend();
   };
 
@@ -427,6 +538,7 @@ export class GameScene extends Phaser.Scene {
         this.controller?.activateFocusedSlot();
         break;
       case 'Escape':
+        this.interruptActiveSwapAndReconcile();
         this.controller?.handleEscapeKey();
         break;
       default:
@@ -435,6 +547,7 @@ export class GameScene extends Phaser.Scene {
   };
 
   private returnToHome(): void {
+    this.coordinator?.dispose();
     this.scene.start(SCENE_KEYS.HOME);
   }
 
@@ -448,12 +561,19 @@ export class GameScene extends Phaser.Scene {
     this.unsubscribePlatformPause = undefined;
     this.unsubscribePlatformResume?.();
     this.unsubscribePlatformResume = undefined;
+    this.unsubscribeMotionPreference?.();
+    this.unsubscribeMotionPreference = undefined;
+    this.motionPreference?.dispose();
+    this.motionPreference = undefined;
 
     if (typeof globalThis.window !== 'undefined') {
       globalThis.window.removeEventListener('blur', this.handleWindowBlur);
       globalThis.window.removeEventListener('focus', this.handleWindowFocus);
       globalThis.window.removeEventListener('keydown', this.handleKeyDown);
     }
+
+    this.coordinator?.dispose();
+    this.coordinator = undefined;
 
     this.outsideTapZone?.removeAllListeners();
     this.controller?.dispose();

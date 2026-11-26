@@ -10,6 +10,8 @@ export interface MatchFeedbackView {
 }
 
 export interface PendingSwapTransition {
+  readonly transitionId: number;
+  readonly attemptId: number;
   readonly firstIndex: number;
   readonly secondIndex: number;
   readonly swap: SwapResult;
@@ -22,12 +24,14 @@ export interface PendingSwapTransition {
  */
 export interface GameplayViewState {
   readonly puzzleId: string;
+  readonly attemptId: number;
   readonly headerTitle: string;
   readonly headerSubtitle: string;
   readonly currentSequence: readonly BottleId[];
   readonly selectedSlotIndex: number | null;
   readonly focusedSlotIndex: number | null;
   readonly displayedMatchCount: number;
+  readonly displayedMoveCount: number;
   readonly totalBottleCount: number;
   readonly moveCount: number;
   readonly bestMatchCount: number;

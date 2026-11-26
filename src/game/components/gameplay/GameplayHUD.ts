@@ -1,18 +1,19 @@
 import Phaser from 'phaser';
 import {
   Colors,
-  createTextStyle,
   DefaultGameTheme,
   MatchCounter,
-  MotionPresets,
-  resolveMotionDuration,
   StatCard,
-  Typography,
   type GameTheme,
 } from '../../../design-system';
-import { GAMEPLAY_CONFIG } from '../../../config/GameplayConfig';
+import {
+  resolveAnimationPolicy,
+  type AnimationPolicy,
+} from '../../animations/core/AnimationPolicy';
 import type { MatchFeedbackView } from '../../gameplay/GameplayViewState';
 import type { GameplayHudLayout } from '../../layout/GameplayLayout';
+import { FloatingMatchFeedback } from '../effects/FloatingMatchFeedback';
+import { spawnParticleBurst } from '../effects/ParticleBurst';
 
 export interface GameplayHudConfig {
   readonly initialMatches: number;
@@ -20,28 +21,29 @@ export interface GameplayHudConfig {
   readonly initialMoves?: number;
   readonly initialTime?: string;
   readonly theme?: GameTheme;
+  readonly policy?: AnimationPolicy;
 }
 
 export class GameplayHUD extends Phaser.GameObjects.Container {
   private theme: GameTheme;
+  private policy: AnimationPolicy;
   private readonly matchCounter: MatchCounter;
   private readonly moveCard: StatCard;
   private readonly timerCard: StatCard;
-  private readonly feedbackText: Phaser.GameObjects.Text;
+  private readonly floatingFeedback: FloatingMatchFeedback;
 
   private lastMatchCount: number;
   private lastTotalCount: number;
   private lastMoveCount: number;
   private lastTimeLabel: string;
   private lastFeedbackId = -1;
-
-  private feedbackTween?: Phaser.Tweens.Tween;
-  private feedbackTimer?: Phaser.Time.TimerEvent;
+  private cancelActiveParticles?: () => void;
 
   public constructor(scene: Phaser.Scene, config: GameplayHudConfig) {
     super(scene, 0, 0);
 
     this.theme = config.theme ?? DefaultGameTheme;
+    this.policy = config.policy ?? resolveAnimationPolicy(this.theme.reducedMotion);
     this.lastMatchCount = config.initialMatches;
     this.lastTotalCount = config.totalBottles;
     this.lastMoveCount = config.initialMoves ?? 0;
@@ -75,20 +77,9 @@ export class GameplayHUD extends Phaser.GameObjects.Container {
       theme: this.theme,
     });
 
-    this.feedbackText = scene.add
-      .text(
-        0,
-        0,
-        '',
-        createTextStyle(Typography.LabelMedium, {
-          color: Colors.Text.Secondary,
-          align: 'center',
-        }),
-      )
-      .setOrigin(0.5)
-      .setVisible(false);
+    this.floatingFeedback = new FloatingMatchFeedback(scene, 0, 0);
 
-    this.add([this.moveCard, this.timerCard, this.matchCounter, this.feedbackText]);
+    this.add([this.moveCard, this.timerCard, this.matchCounter, this.floatingFeedback]);
     scene.add.existing(this);
   }
 
@@ -105,8 +96,15 @@ export class GameplayHUD extends Phaser.GameObjects.Container {
     this.timerCard.setScale(layout.scale);
     this.timerCard.setPosition(layout.timerX, layout.timerY);
 
-    this.feedbackText.setPosition(layout.feedbackX, layout.feedbackY);
+    this.floatingFeedback.setAnchorPosition(layout.feedbackX, layout.feedbackY);
     return this;
+  }
+
+  public getMatchCounterPosition(): { readonly x: number; readonly y: number } {
+    return {
+      x: this.x + this.matchCounter.x,
+      y: this.y + this.matchCounter.y,
+    };
   }
 
   public setMatches(matched: number, total: number, animate = true): this {
@@ -119,12 +117,13 @@ export class GameplayHUD extends Phaser.GameObjects.Container {
     return this;
   }
 
-  public setMoveCount(moves: number): this {
+  public setMoveCount(moves: number, animate = true): this {
     if (moves === this.lastMoveCount) {
       return this;
     }
+    const shouldPulse = animate && moves > this.lastMoveCount && this.policy.allowCounterPop;
     this.lastMoveCount = moves;
-    this.moveCard.setValue(String(moves));
+    this.moveCard.setValue(String(moves), shouldPulse);
     return this;
   }
 
@@ -147,99 +146,55 @@ export class GameplayHUD extends Phaser.GameObjects.Container {
       return this;
     }
     this.lastFeedbackId = feedback.sequenceId;
-    this.clearFeedbackTimers();
+    this.stopActiveParticles();
 
-    const color =
-      feedback.tone === 'positive'
-        ? Colors.Semantic.Success
-        : feedback.tone === 'negative'
-          ? Colors.Semantic.Error
-          : Colors.Text.Secondary;
+    this.floatingFeedback.show(feedback, this.policy);
 
-    this.feedbackText.setColor(color);
-    this.feedbackText.setText(feedback.text);
-    this.feedbackText.setVisible(true);
-    this.feedbackText.setAlpha(1);
-
-    const fadeInDur = resolveMotionDuration(
-      MotionPresets.FadeIn.duration,
-      this.theme.reducedMotion,
-    );
-    if (fadeInDur > 0) {
-      this.feedbackText.setAlpha(0).setScale(0.92);
-      this.feedbackTween = this.scene.tweens.add({
-        targets: this.feedbackText,
-        alpha: 1,
-        scaleX: 1,
-        scaleY: 1,
-        duration: fadeInDur,
-        ease: MotionPresets.FadeIn.ease,
+    // Subtle aggregate sparkle burst near MatchCounter ONLY for positive aggregate deltas
+    if (feedback.tone === 'positive' && this.policy.allowParticles) {
+      const pos = this.getMatchCounterPosition();
+      this.cancelActiveParticles = spawnParticleBurst(this.scene, {
+        x: pos.x + this.matchCounter.width * 0.25,
+        y: pos.y - 12,
+        kind: 'matchPositive',
+        policy: this.policy,
+        depth: 420,
       });
-    } else {
-      this.feedbackText.setScale(1);
     }
-
-    this.feedbackTimer = this.scene.time.delayedCall(
-      GAMEPLAY_CONFIG.matchFeedbackDurationMs,
-      () => {
-        this.fadeOutFeedback();
-      },
-    );
 
     return this;
   }
 
   public clearFeedback(): this {
-    this.clearFeedbackTimers();
-    this.feedbackText.setVisible(false);
-    this.feedbackText.setText('');
+    this.stopActiveParticles();
+    this.floatingFeedback.clear();
+    return this;
+  }
+
+  public setPolicy(policy: AnimationPolicy): this {
+    this.policy = policy;
     return this;
   }
 
   public setTheme(theme: GameTheme): this {
     this.theme = theme;
+    this.policy = resolveAnimationPolicy(theme.reducedMotion, this.policy.timeScale);
     this.matchCounter.setTheme(theme);
     this.moveCard.setTheme(theme);
     this.timerCard.setTheme(theme);
     return this;
   }
 
-  private fadeOutFeedback(): void {
-    this.clearFeedbackTimers();
-    const fadeOutDur = resolveMotionDuration(
-      MotionPresets.FadeOut.duration,
-      this.theme.reducedMotion,
-    );
-    if (fadeOutDur === 0) {
-      this.feedbackText.setVisible(false);
-      return;
-    }
-
-    this.feedbackTween = this.scene.tweens.add({
-      targets: this.feedbackText,
-      alpha: 0,
-      duration: fadeOutDur,
-      ease: MotionPresets.FadeOut.ease,
-      onComplete: () => {
-        this.feedbackText.setVisible(false);
-        this.feedbackTween = undefined;
-      },
-    });
-  }
-
-  private clearFeedbackTimers(): void {
-    if (this.feedbackTimer !== undefined) {
-      this.feedbackTimer.remove(false);
-      this.feedbackTimer = undefined;
-    }
-    if (this.feedbackTween !== undefined) {
-      this.feedbackTween.stop();
-      this.feedbackTween = undefined;
+  private stopActiveParticles(): void {
+    if (this.cancelActiveParticles !== undefined) {
+      this.cancelActiveParticles();
+      this.cancelActiveParticles = undefined;
     }
   }
 
   public override destroy(fromScene?: boolean): void {
-    this.clearFeedbackTimers();
+    this.stopActiveParticles();
+    this.floatingFeedback.clear();
     super.destroy(fromScene);
   }
 }

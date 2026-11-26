@@ -5,9 +5,9 @@ import { Colors, hexToNumber, type BottleColorId } from '../../../design-system/
 import {
   MotionDurations,
   MotionEasings,
+  MotionParams,
   resolveMotionDuration,
 } from '../../../design-system/tokens/Motion';
-import { EFFECT_TEXTURE_KEYS } from '../../assets/AssetKeys';
 import { getBottleMetadata } from '../../assets/BottleCatalog';
 import { BottleSelectionIndicator } from './BottleSelectionIndicator';
 import { BottleShadow } from './BottleShadow';
@@ -32,72 +32,26 @@ export interface BottleSpriteConfig {
   readonly theme?: GameTheme;
 }
 
-interface StatePose {
+export interface BottleSwapTransform {
+  readonly liftY?: number;
+  readonly scaleX?: number;
+  readonly scaleY?: number;
+  readonly rotation?: number;
+  readonly shadowOffsetX?: number;
+  readonly shadowOffsetY?: number;
+  readonly shadowElevation?: number;
+}
+
+interface ResolvedBottlePose {
   readonly liftY: number;
   readonly scaleX: number;
   readonly scaleY: number;
   readonly shadowLift: number;
   readonly bottleAlpha: number;
   readonly showSelection: boolean;
-  readonly showTrail: boolean;
+  readonly durationMs: number;
+  readonly ease: string;
 }
-
-const POSE_BY_STATE: Readonly<Record<BottleVisualState, StatePose>> = {
-  default: {
-    liftY: 0,
-    scaleX: 1,
-    scaleY: 1,
-    shadowLift: 0,
-    bottleAlpha: 1,
-    showSelection: false,
-    showTrail: false,
-  },
-  hovered: {
-    liftY: -7,
-    scaleX: 1.03,
-    scaleY: 1.03,
-    shadowLift: 7,
-    bottleAlpha: 1,
-    showSelection: false,
-    showTrail: false,
-  },
-  pressed: {
-    liftY: 2,
-    scaleX: 1.04,
-    scaleY: 0.95,
-    shadowLift: 0,
-    bottleAlpha: 1,
-    showSelection: false,
-    showTrail: false,
-  },
-  selected: {
-    liftY: -16,
-    scaleX: 1.04,
-    scaleY: 1.04,
-    shadowLift: 16,
-    bottleAlpha: 1,
-    showSelection: true,
-    showTrail: false,
-  },
-  swapping: {
-    liftY: -22,
-    scaleX: 1.05,
-    scaleY: 1.05,
-    shadowLift: 24,
-    bottleAlpha: 0.98,
-    showSelection: false,
-    showTrail: true,
-  },
-  disabled: {
-    liftY: 0,
-    scaleX: 1,
-    scaleY: 1,
-    shadowLift: 0,
-    bottleAlpha: 0.45,
-    showSelection: false,
-    showTrail: false,
-  },
-};
 
 export class BottleSprite extends Phaser.GameObjects.Container {
   private theme: GameTheme;
@@ -118,12 +72,10 @@ export class BottleSprite extends Phaser.GameObjects.Container {
   private readonly shadow: BottleShadow;
   private readonly bodyContainer: Phaser.GameObjects.Container;
   private readonly selectionIndicator: BottleSelectionIndicator;
-  private readonly trailContainer: Phaser.GameObjects.Container;
   private readonly bottleImage: Phaser.GameObjects.Image;
   private readonly hitZone: Phaser.GameObjects.Zone;
 
   private activePoseTween?: Phaser.Tweens.Tween;
-  private activeTrailTween?: Phaser.Tweens.Tween;
 
   public constructor(scene: Phaser.Scene, config: BottleSpriteConfig) {
     super(scene, config.x ?? 0, config.y ?? 0);
@@ -159,15 +111,12 @@ export class BottleSprite extends Phaser.GameObjects.Container {
       theme: this.theme,
     });
 
-    this.trailContainer = this.buildMotionTrail(scene, metadata.colorHex);
-    this.trailContainer.setVisible(false);
-
     this.bottleImage = scene.add
       .image(0, 0, metadata.textureKey)
       .setOrigin(0.5, 1)
       .setDisplaySize(this.bottleWidth, this.bottleHeight);
 
-    this.bodyContainer.add([this.trailContainer, this.selectionIndicator, this.bottleImage]);
+    this.bodyContainer.add([this.selectionIndicator, this.bottleImage]);
 
     this.hitZone = scene.add
       .zone(
@@ -199,6 +148,21 @@ export class BottleSprite extends Phaser.GameObjects.Container {
     return this.bottleId;
   }
 
+  public getBottleDimensions(): { readonly width: number; readonly height: number } {
+    return {
+      width: this.bottleWidth,
+      height: this.bottleHeight,
+    };
+  }
+
+  public getBodyContainer(): Phaser.GameObjects.Container {
+    return this.bodyContainer;
+  }
+
+  public getShadow(): BottleShadow {
+    return this.shadow;
+  }
+
   public setBottleId(nextId: BottleColorId): this {
     if (this.bottleId === nextId) {
       return this;
@@ -207,7 +171,6 @@ export class BottleSprite extends Phaser.GameObjects.Container {
     const metadata = getBottleMetadata(nextId);
     this.bottleImage.setTexture(metadata.textureKey);
     this.bottleImage.setDisplaySize(this.bottleWidth, this.bottleHeight);
-    this.tintMotionTrail(metadata.colorHex);
     return this;
   }
 
@@ -227,6 +190,9 @@ export class BottleSprite extends Phaser.GameObjects.Container {
       ensureMinimumTouchTarget(this.bottleHeight),
     );
     this.setSize(this.bottleWidth, this.bottleHeight);
+    if (!this.swappingState) {
+      this.applyVisualState(false);
+    }
     return this;
   }
 
@@ -274,9 +240,59 @@ export class BottleSprite extends Phaser.GameObjects.Container {
     if (swapping) {
       this.hoveredState = false;
       this.pressedState = false;
+      this.stopPoseTween();
+      this.selectionIndicator.setSelectedVisible(false, false);
     }
     this.updateCursor();
-    this.applyVisualState(animate);
+    if (!swapping) {
+      this.bodyContainer.setRotation(0);
+      this.shadow.resetShadow();
+      this.applyVisualState(animate);
+    }
+    return this;
+  }
+
+  /**
+   * Direct per-frame transform hook used by BottleSwapAnimation during anticipation,
+   * curved Bezier flight, and landing squash-and-stretch.
+   */
+  public setSwapTransform(transform: BottleSwapTransform): this {
+    this.stopPoseTween();
+    if (transform.liftY !== undefined) {
+      this.bodyContainer.setY(transform.liftY);
+    }
+    if (transform.scaleX !== undefined || transform.scaleY !== undefined) {
+      this.bodyContainer.setScale(
+        transform.scaleX ?? this.bodyContainer.scaleX,
+        transform.scaleY ?? this.bodyContainer.scaleY,
+      );
+    }
+    if (transform.rotation !== undefined) {
+      this.bodyContainer.setRotation(transform.rotation);
+    }
+    if (transform.shadowOffsetX !== undefined || transform.shadowOffsetY !== undefined) {
+      this.shadow.setGroundOffset(transform.shadowOffsetX ?? 0, transform.shadowOffsetY ?? 0);
+    }
+    if (transform.shadowElevation !== undefined) {
+      this.shadow.setElevationImmediate(transform.shadowElevation, this.bottleHeight * 0.45);
+    }
+    return this;
+  }
+
+  /**
+   * Immediately stops active bottle pose tweens and restores clean scale, rotation,
+   * elevation, opacity, and grounded shadow state.
+   */
+  public resetVisualTransform(): this {
+    this.stopPoseTween();
+    this.swappingState = false;
+    this.pressedState = false;
+    this.bodyContainer.setPosition(0, 0);
+    this.bodyContainer.setScale(1, 1);
+    this.bodyContainer.setRotation(0);
+    this.shadow.resetShadow();
+    this.updateCursor();
+    this.applyVisualState(false);
     return this;
   }
 
@@ -326,6 +342,9 @@ export class BottleSprite extends Phaser.GameObjects.Container {
     this.theme = theme;
     this.shadow.setTheme(theme);
     this.selectionIndicator.setTheme(theme);
+    if (!this.swappingState) {
+      this.applyVisualState(false);
+    }
     return this;
   }
 
@@ -346,6 +365,7 @@ export class BottleSprite extends Phaser.GameObjects.Container {
     this.hitZone.on(Phaser.Input.Events.GAMEOBJECT_POINTER_DOWN, this.handleDown);
     this.hitZone.on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, this.handleUp);
     this.scene.input.on(Phaser.Input.Events.POINTER_UP, this.handleGlobalUp);
+    this.scene.input.on(Phaser.Input.Events.POINTER_UP_OUTSIDE, this.handleGlobalUp);
   }
 
   private updateCursor(): void {
@@ -354,12 +374,16 @@ export class BottleSprite extends Phaser.GameObjects.Container {
     }
   }
 
-  private readonly handleOver = (): void => {
-    if (!this.canAcceptInput()) {
+  private readonly handleOver = (pointer: Phaser.Input.Pointer): void => {
+    // Touch devices do not depend on hover behaviour
+    if (!this.canAcceptInput() || pointer.wasTouch) {
       return;
     }
     this.hoveredState = true;
-    this.applyVisualState(true);
+    // Do not let hover override an active selection or swap animation
+    if (!this.selectedState && !this.swappingState && !this.pressedState) {
+      this.applyVisualState(true);
+    }
   };
 
   private readonly handleOut = (): void => {
@@ -368,7 +392,9 @@ export class BottleSprite extends Phaser.GameObjects.Container {
     }
     this.hoveredState = false;
     this.pressedState = false;
-    this.applyVisualState(true);
+    if (!this.swappingState) {
+      this.applyVisualState(true);
+    }
   };
 
   private readonly handleDown = (): void => {
@@ -396,16 +422,102 @@ export class BottleSprite extends Phaser.GameObjects.Container {
     }
     this.pressedState = false;
     this.hoveredState = false;
-    this.applyVisualState(true);
+    if (!this.swappingState) {
+      this.applyVisualState(true);
+    }
   };
+
+  private resolvePose(state: BottleVisualState): ResolvedBottlePose {
+    const reduced = this.theme.reducedMotion;
+    const hoverLift = reduced
+      ? 0
+      : Math.round(this.bottleHeight * MotionParams.hoverElevationRatio);
+    const selectLift = reduced
+      ? 0
+      : Math.round(this.bottleHeight * MotionParams.selectionElevationRatio);
+    const swapLift = reduced
+      ? 0
+      : Math.round(this.bottleHeight * MotionParams.swapAnticipationLiftRatio * 2);
+
+    switch (state) {
+      case 'hovered':
+        return {
+          liftY: -hoverLift,
+          scaleX: reduced ? 1 : MotionParams.hoverScale,
+          scaleY: reduced ? 1 : MotionParams.hoverScale,
+          shadowLift: hoverLift,
+          bottleAlpha: 1,
+          showSelection: false,
+          durationMs: MotionDurations.BottleHover,
+          ease: MotionEasings.EaseOut,
+        };
+      case 'pressed': {
+        const baseLift = this.selectedState ? -selectLift : 0;
+        return {
+          liftY: baseLift + (reduced ? 0 : 2),
+          scaleX: reduced ? 0.98 : MotionParams.pressScaleX,
+          scaleY: reduced ? 0.98 : MotionParams.pressScaleY,
+          shadowLift: this.selectedState ? selectLift * 0.8 : 0,
+          bottleAlpha: 1,
+          showSelection: this.selectedState,
+          durationMs: MotionDurations.ButtonPress,
+          ease: MotionEasings.EaseOutQuad,
+        };
+      }
+      case 'selected':
+        return {
+          liftY: -selectLift,
+          scaleX: reduced ? 1 : MotionParams.selectionScale,
+          scaleY: reduced ? 1 : MotionParams.selectionScale,
+          shadowLift: selectLift,
+          bottleAlpha: 1,
+          showSelection: true,
+          durationMs: MotionDurations.BottleSelection,
+          ease: MotionEasings.SoftOvershoot,
+        };
+      case 'swapping':
+        return {
+          liftY: -swapLift,
+          scaleX: 1,
+          scaleY: 1,
+          shadowLift: swapLift,
+          bottleAlpha: 1,
+          showSelection: false,
+          durationMs: MotionDurations.SwapAnticipation,
+          ease: MotionEasings.EaseOut,
+        };
+      case 'disabled':
+        return {
+          liftY: 0,
+          scaleX: 1,
+          scaleY: 1,
+          shadowLift: 0,
+          bottleAlpha: 0.48,
+          showSelection: false,
+          durationMs: MotionDurations.BottleDeselection,
+          ease: MotionEasings.EaseOut,
+        };
+      case 'default':
+      default:
+        return {
+          liftY: 0,
+          scaleX: 1,
+          scaleY: 1,
+          shadowLift: 0,
+          bottleAlpha: 1,
+          showSelection: false,
+          durationMs: MotionDurations.BottleDeselection,
+          ease: MotionEasings.GentleSettle,
+        };
+    }
+  }
 
   private applyVisualState(animate: boolean): void {
     const state = this.getVisualState();
-    const pose = POSE_BY_STATE[state];
+    const pose = this.resolvePose(state);
 
     this.selectionIndicator.setSelectedVisible(pose.showSelection, animate);
-    this.shadow.setElevation(pose.shadowLift, animate);
-    this.updateMotionTrail(pose.showTrail);
+    this.shadow.setElevation(pose.shadowLift, animate, this.bottleHeight * 0.25);
 
     if (state === 'disabled') {
       this.bottleImage.setTint(hexToNumber(Colors.Text.Disabled));
@@ -416,13 +528,12 @@ export class BottleSprite extends Phaser.GameObjects.Container {
     const targetAlpha = this.baseOpacity * pose.bottleAlpha;
 
     this.stopPoseTween();
-    const duration = animate
-      ? resolveMotionDuration(MotionDurations.Short, this.theme.reducedMotion)
-      : 0;
+    const duration = animate ? resolveMotionDuration(pose.durationMs, this.theme.reducedMotion) : 0;
 
     if (duration === 0) {
       this.bodyContainer.setPosition(0, pose.liftY);
       this.bodyContainer.setScale(pose.scaleX, pose.scaleY);
+      this.bodyContainer.setRotation(0);
       this.bottleImage.setAlpha(targetAlpha);
       return;
     }
@@ -432,62 +543,14 @@ export class BottleSprite extends Phaser.GameObjects.Container {
       y: pose.liftY,
       scaleX: pose.scaleX,
       scaleY: pose.scaleY,
+      rotation: 0,
       duration,
-      ease: state === 'selected' ? MotionEasings.EaseOutBack : MotionEasings.EaseOutCubic,
+      ease: pose.ease,
       onComplete: () => {
         this.activePoseTween = undefined;
       },
     });
     this.bottleImage.setAlpha(targetAlpha);
-  }
-
-  private buildMotionTrail(scene: Phaser.Scene, colorHex: string): Phaser.GameObjects.Container {
-    const container = scene.add.container(0, -this.bottleHeight * 0.45);
-    const offsets = [
-      { x: -this.bottleWidth * 0.48, y: 12, scale: 0.72, alpha: 0.55 },
-      { x: -this.bottleWidth * 0.78, y: 20, scale: 0.48, alpha: 0.32 },
-      { x: this.bottleWidth * 0.48, y: 12, scale: 0.72, alpha: 0.55 },
-    ];
-    const tint = hexToNumber(colorHex);
-
-    for (const item of offsets) {
-      const dot = scene.add
-        .image(item.x, item.y, EFFECT_TEXTURE_KEYS.PARTICLE)
-        .setScale(item.scale)
-        .setAlpha(item.alpha)
-        .setTint(tint);
-      container.add(dot);
-    }
-
-    return container;
-  }
-
-  private tintMotionTrail(colorHex: string): void {
-    const tint = hexToNumber(colorHex);
-    for (const child of this.trailContainer.list) {
-      if (child instanceof Phaser.GameObjects.Image) {
-        child.setTint(tint);
-      }
-    }
-  }
-
-  private updateMotionTrail(active: boolean): void {
-    this.stopTrailTween();
-    this.trailContainer.setVisible(active);
-    if (!active || this.theme.reducedMotion) {
-      this.trailContainer.setAlpha(active ? 0.65 : 0);
-      return;
-    }
-
-    this.trailContainer.setAlpha(0.85);
-    this.activeTrailTween = this.scene.tweens.add({
-      targets: this.trailContainer,
-      alpha: { from: 0.85, to: 0.35 },
-      duration: MotionDurations.Medium,
-      yoyo: true,
-      repeat: -1,
-      ease: MotionEasings.EaseInOutCubic,
-    });
   }
 
   private stopPoseTween(): void {
@@ -497,18 +560,11 @@ export class BottleSprite extends Phaser.GameObjects.Container {
     }
   }
 
-  private stopTrailTween(): void {
-    if (this.activeTrailTween !== undefined) {
-      this.activeTrailTween.stop();
-      this.activeTrailTween = undefined;
-    }
-  }
-
   public override destroy(fromScene?: boolean): void {
     this.stopPoseTween();
-    this.stopTrailTween();
     if (this.interactiveEnabled) {
       this.scene.input.off(Phaser.Input.Events.POINTER_UP, this.handleGlobalUp);
+      this.scene.input.off(Phaser.Input.Events.POINTER_UP_OUTSIDE, this.handleGlobalUp);
     }
     this.hitZone.removeAllListeners();
     super.destroy(fromScene);

@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { DefaultGameTheme, type GameTheme } from '../../theme/GameTheme';
 import { Colors, hexToNumber } from '../../tokens/Colors';
 import { Dimens } from '../../tokens/Dimens';
+import { MotionDurations, MotionEasings, resolveMotionDuration } from '../../tokens/Motion';
 import { SemanticShapes } from '../../tokens/Shapes';
 import { createTextStyle, Typography } from '../../tokens/Typography';
 import { drawIcon, type DesignIconName } from '../common/IconGraphic';
@@ -30,6 +31,7 @@ export class StatCard extends Phaser.GameObjects.Container {
   private readonly iconGraphics: Phaser.GameObjects.Graphics;
   private readonly valueText: Phaser.GameObjects.Text;
   private readonly labelText: Phaser.GameObjects.Text;
+  private valuePulseTween?: Phaser.Tweens.Tween;
 
   public constructor(scene: Phaser.Scene, config: StatCardConfig) {
     super(scene, config.x ?? 0, config.y ?? 0);
@@ -73,8 +75,44 @@ export class StatCard extends Phaser.GameObjects.Container {
     scene.add.existing(this);
   }
 
-  public setValue(value: string): this {
+  public setValue(value: string, pulse = false): this {
     this.valueText.setText(value);
+    if (pulse) {
+      this.pulseValue();
+    }
+    return this;
+  }
+
+  /**
+   * Subtle scale emphasis on the stat value (e.g. when move count increments after a swap).
+   */
+  public pulseValue(): this {
+    if (this.valuePulseTween !== undefined) {
+      this.valuePulseTween.stop();
+      this.valuePulseTween = undefined;
+    }
+
+    this.valueText.setScale(1);
+    const duration = resolveMotionDuration(
+      MotionDurations.MoveCounterFeedback,
+      this.theme.reducedMotion,
+    );
+    if (duration === 0) {
+      return this;
+    }
+
+    this.valuePulseTween = this.scene.tweens.add({
+      targets: this.valueText,
+      scaleX: 1.08,
+      scaleY: 1.08,
+      duration: Math.round(duration * 0.45),
+      yoyo: true,
+      ease: MotionEasings.GentleSettle,
+      onComplete: () => {
+        this.valueText.setScale(1);
+        this.valuePulseTween = undefined;
+      },
+    });
     return this;
   }
 
@@ -139,5 +177,13 @@ export class StatCard extends Phaser.GameObjects.Container {
     const textStartX = badgeCenterX + badgeRadius + Dimens.Space12;
     this.valueText.setPosition(textStartX, -11);
     this.labelText.setPosition(textStartX, 14);
+  }
+
+  public override destroy(fromScene?: boolean): void {
+    if (this.valuePulseTween !== undefined) {
+      this.valuePulseTween.stop();
+      this.valuePulseTween = undefined;
+    }
+    super.destroy(fromScene);
   }
 }

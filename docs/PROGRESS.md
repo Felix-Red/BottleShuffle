@@ -88,15 +88,34 @@ This document tracks completed milestones, technical notes, and planned upcoming
 
 #### Known Limitations & Assumptions (Task 06)
 
-- **Simple swap presentation:** Swaps currently use a clean linear/cubic position tween; curved swap arcs, celebratory effects, and audio feedback are deferred to Task 07+.
+- **Simple swap presentation (upgraded in Task 07):** Task 06 used a lightweight position tween; Task 07 replaced it with multi-stage curved swap trajectories, dynamic shadows, and HUD feedback.
 - **Temporary overlays & home screen:** Pause, completion, and home screens are intentionally functional development layouts; final home design, scoring/stars, level unlocking, settings persistence, drag-and-drop swapping, and YouTube Playables SDK integration remain deferred to subsequent tasks.
 - **Canvas accessibility:** Basic keyboard slot navigation and focus highlighting are implemented, while full screen-reader accessibility over canvas remains a known Phaser limitation.
 
+### Task 07: Animations and Interaction Feedback — Completed
+
+- Extended centralised design-system motion tokens (`src/design-system/tokens/Motion.ts`) with semantic gameplay durations (`470ms` swap total, `100–150ms` interactions, `250ms` match feedback, `650ms` floating delta, `800ms` celebration), native Phaser easing aliases, relative `MotionParams`, and `0.96 -> 1.00` ease-out modal transitions.
+- Implemented pure animation architecture in `src/game/animations/`:
+  - `AnimationMath.ts` & `AnimationCurves.ts`: quadratic Bezier evaluation, opposing horizontal/vertical/diagonal/cross-row swap trajectories with sublinear scaling and safe playfield bounds clamping, relative squash-and-stretch deformation, shadow elevation math, and mid-flight tilt.
+  - `AnimationPolicy.ts` & `src/services/MotionPreferenceService.ts`: centralised reduced-motion policy observing `prefers-reduced-motion` + programmatic overrides with clean listener disposal.
+  - `AnimationHandle.ts` & `AnimationCoordinator.ts`: epoch-scoped transition coordination preventing duplicate swaps, stale completion callbacks, and leaked decorative effects on pause, resize, platform suspend, restart, or shutdown.
+- Upgraded visual components and effects:
+  - `BottleSprite`, `BottleShadow`, and `BottleSelectionIndicator`: relative hover/selection lifts, tactile press feedback with outside-release recovery, grounded dynamic swap shadows, and landing compression.
+  - `BottleSwapAnimation.ts`: 3-stage swap (`70ms` anticipation + `300ms` opposing Bezier flight + `100ms` relative squash-and-stretch landing; `110ms` direct glide in reduced motion) plus optional bounded `BottleMotionTrail` for longer swaps.
+  - `MatchCounter`, `StatCard`, `FloatingMatchFeedback`, `ParticleBurst`, and `VictoryCelebration`: directional aggregate match feedback, subtle move counter pulse, bounded sparkle/confetti bursts (`8` match / `22` victory), and post-solve full-rack success glow.
+  - Integrated into `GameplayController`, `GameplayHUD`, `GameplayBoard`, and `GameScene`.
+- Added development-only `AnimationShowcaseScene` (`/?scene=animations`, gated behind `import.meta.env.DEV` with Reduced-Motion & Slow-Motion toggles).
+- Added unit and integration test suites (`tests/unit/animations/*` and `tests/integration/AnimationIntegration.test.ts`).
+- Authored `docs/ANIMATIONS.md` and updated `docs/DESIGN_SYSTEM.md`, `docs/GAMEPLAY_SCREEN.md`, `docs/PROGRESS.md`, and `README.md`.
+
+#### Known Limitations & Assumptions (Task 07)
+
+- **No persistent motion settings yet:** `MotionPreferenceService` supports runtime overrides and system `prefers-reduced-motion`, while persisting user settings remains deferred to the future persistence/settings task.
+- **Deferred features:** Audio SFX/music, drag-and-drop swapping, scoring/stars, level progression/unlocking, final Home & Victory screens, and YouTube Playables SDK integration remain deferred to subsequent tasks.
+
 ## Upcoming Tasks (Planned)
 
-- **Polish, Animations & Audio (`src/game/` & `src/services/`):** Curved swap trajectories, juice/celebration feedback, drag-and-drop support, and locally bundled SFX/music respecting `GamePlatform` audio preferences.
-- **Level & Difficulty Progression:** Level definitions, bottle counts, scoring/move tracking, and persistence service built on `GamePlatform`.
-- **Interactive Gameplay Scene:** Wiring `BottleRack`, `BottleSprite`, `HiddenSequenceRack`, `MatchCounter`, swap animations, and input handling to `src/core/`.
-- **Audio System:** Local SFX/music playback respecting `GamePlatform` audio preferences and pause/resume lifecycle events.
-- **Final Screens & Flows:** Production Home screen, level selection, settings, and victory reveal flows.
+- **Audio System (`src/services/`):** Local SFX/music playback respecting `GamePlatform` audio preferences and pause/resume lifecycle events.
+- **Level & Difficulty Progression:** Level definitions, scoring/move tracking, star ratings, and persistence service built on `GamePlatform`.
+- **Final Screens & Flows:** Production Home screen, level selection, settings (including persisted reduced-motion toggle), and final victory reveal flows.
 - **YouTube Playables Integration & Certification Readiness:** `YouTubeGamePlatform` adapter, SDK script integration, bundle optimisation, and SDK Test Suite compliance checks.

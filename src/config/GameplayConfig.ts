@@ -3,8 +3,8 @@ import { MotionDurations } from '../design-system/tokens/Motion';
 
 export const GAMEPLAY_CONFIG = {
   defaultDifficulty: 'normal' as DifficultyId,
-  swapTransitionDurationMs: MotionDurations.Normal,
-  matchFeedbackDurationMs: 1700,
+  swapTransitionDurationMs: MotionDurations.SwapTotal,
+  matchFeedbackDurationMs: MotionDurations.FloatingMatchFeedback,
   timerPollIntervalMs: 250,
 } as const;
 

@@ -214,6 +214,7 @@ export class Modal extends Phaser.GameObjects.Container {
     this.stopTweens();
 
     const finishClose = (): void => {
+      this.dialogContainer.setScale(1);
       this.setVisible(false);
       if (notifyDismiss) {
         this.onDismissCallback?.();

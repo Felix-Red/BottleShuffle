@@ -5,6 +5,7 @@ import {
   MotionEasings,
   resolveMotionDuration,
 } from '../../../design-system/tokens/Motion';
+import { calculateShadowForElevation } from '../../animations/utils/AnimationMath';
 import { EFFECT_TEXTURE_KEYS } from '../../assets/AssetKeys';
 
 export interface BottleShadowConfig {
@@ -18,12 +19,15 @@ export interface BottleShadowConfig {
 const DEFAULT_BASE_ALPHA = 0.65;
 const SHADOW_WIDTH_MULTIPLIER = 1.06;
 const SHADOW_ASPECT_RATIO = 64 / 256;
+const DEFAULT_MAX_LIFT_PX = 36;
 
 export class BottleShadow extends Phaser.GameObjects.Container {
   private theme: GameTheme;
   private baseWidth: number;
   private baseHeight: number;
   private readonly baseAlpha: number;
+  private readonly restX: number;
+  private readonly restY: number;
   private readonly shadowImage: Phaser.GameObjects.Image;
   private activeTween?: Phaser.Tweens.Tween;
 
@@ -31,7 +35,10 @@ export class BottleShadow extends Phaser.GameObjects.Container {
     super(scene, config.x ?? 0, config.y ?? 0);
 
     this.theme = config.theme ?? DefaultGameTheme;
+    this.restX = config.x ?? 0;
+    this.restY = config.y ?? 0;
     this.baseAlpha = config.baseAlpha ?? DEFAULT_BASE_ALPHA;
+
     const bottleWidth = Math.max(32, config.bottleWidth ?? 88);
     this.baseWidth = bottleWidth * SHADOW_WIDTH_MULTIPLIER;
     this.baseHeight = Math.max(12, Math.round(this.baseWidth * SHADOW_ASPECT_RATIO));
@@ -61,42 +68,100 @@ export class BottleShadow extends Phaser.GameObjects.Container {
    * Adjusts contact shadow prominence as the bottle lifts above the shelf.
    * Higher lift produces a slightly smaller, softer shadow anchored on the shelf.
    */
-  public setElevation(liftPx: number, animate = true): this {
-    const normalizedLift = Math.min(1, Math.max(0, liftPx / 24));
-    const targetScaleX = 1 - normalizedLift * 0.24;
-    const targetScaleY = 1 - normalizedLift * 0.18;
-    const targetAlpha = this.baseAlpha * (1 - normalizedLift * 0.52);
-
+  public setElevation(liftPx: number, animate = true, maxLiftPx = DEFAULT_MAX_LIFT_PX): this {
+    const state = calculateShadowForElevation(liftPx, maxLiftPx, this.baseAlpha);
     this.stopTween();
 
     const duration = animate
-      ? resolveMotionDuration(MotionDurations.Short, this.theme.reducedMotion)
+      ? resolveMotionDuration(MotionDurations.BottleSelection, this.theme.reducedMotion)
       : 0;
 
+    const baseScaleX = this.baseWidth / Math.max(1, this.shadowImage.width);
+    const baseScaleY = this.baseHeight / Math.max(1, this.shadowImage.height);
+
     if (duration === 0) {
-      this.shadowImage.setScale(
-        (this.baseWidth / this.shadowImage.width) * targetScaleX,
-        (this.baseHeight / this.shadowImage.height) * targetScaleY,
-      );
-      this.shadowImage.setAlpha(targetAlpha);
+      this.shadowImage.setScale(baseScaleX * state.scaleX, baseScaleY * state.scaleY);
+      this.shadowImage.setAlpha(state.alpha);
       return this;
     }
 
-    const baseScaleX = this.baseWidth / this.shadowImage.width;
-    const baseScaleY = this.baseHeight / this.shadowImage.height;
-
     this.activeTween = this.scene.tweens.add({
       targets: this.shadowImage,
-      scaleX: baseScaleX * targetScaleX,
-      scaleY: baseScaleY * targetScaleY,
-      alpha: targetAlpha,
+      scaleX: baseScaleX * state.scaleX,
+      scaleY: baseScaleY * state.scaleY,
+      alpha: state.alpha,
       duration,
-      ease: MotionEasings.EaseOutCubic,
+      ease: MotionEasings.EaseOut,
       onComplete: () => {
         this.activeTween = undefined;
       },
     });
 
+    return this;
+  }
+
+  /**
+   * Per-frame shadow update used during curved swaps without spawning tweens.
+   */
+  public setElevationImmediate(liftPx: number, maxLiftPx = DEFAULT_MAX_LIFT_PX): this {
+    this.stopTween();
+    const state = calculateShadowForElevation(liftPx, maxLiftPx, this.baseAlpha);
+    const baseScaleX = this.baseWidth / Math.max(1, this.shadowImage.width);
+    const baseScaleY = this.baseHeight / Math.max(1, this.shadowImage.height);
+    this.shadowImage.setScale(baseScaleX * state.scaleX, baseScaleY * state.scaleY);
+    this.shadowImage.setAlpha(state.alpha);
+    return this;
+  }
+
+  /**
+   * Offsets the shadow relative to the bottle container so the shadow remains
+   * grounded along the shelf chord while the bottle arcs vertically.
+   */
+  public setGroundOffset(offsetX: number, offsetY: number): this {
+    this.setPosition(this.restX + offsetX, this.restY + offsetY);
+    return this;
+  }
+
+  /**
+   * Brief grounded compression when a bottle lands on the shelf.
+   */
+  public playLandingCompression(durationMs: number): this {
+    this.stopTween();
+    this.setPosition(this.restX, this.restY);
+
+    const baseScaleX = this.baseWidth / Math.max(1, this.shadowImage.width);
+    const baseScaleY = this.baseHeight / Math.max(1, this.shadowImage.height);
+
+    const effectiveDuration = resolveMotionDuration(durationMs, this.theme.reducedMotion);
+    if (effectiveDuration === 0) {
+      this.shadowImage.setScale(baseScaleX, baseScaleY);
+      this.shadowImage.setAlpha(this.baseAlpha);
+      return this;
+    }
+
+    this.shadowImage.setScale(baseScaleX * 1.07, baseScaleY * 1.04);
+    this.shadowImage.setAlpha(Math.min(0.82, this.baseAlpha * 1.12));
+
+    this.activeTween = this.scene.tweens.add({
+      targets: this.shadowImage,
+      scaleX: baseScaleX,
+      scaleY: baseScaleY,
+      alpha: this.baseAlpha,
+      duration: effectiveDuration,
+      ease: MotionEasings.GentleSettle,
+      onComplete: () => {
+        this.activeTween = undefined;
+      },
+    });
+
+    return this;
+  }
+
+  public resetShadow(): this {
+    this.stopTween();
+    this.setPosition(this.restX, this.restY);
+    this.shadowImage.setDisplaySize(this.baseWidth, this.baseHeight);
+    this.shadowImage.setAlpha(this.baseAlpha);
     return this;
   }
 
