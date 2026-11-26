@@ -21,7 +21,7 @@ flowchart TD
     PlatformContracts["src/platform/contracts/"]
     PlatformImpl["src/platform/browser/ & youtube/"]
     Services["src/services/ (Planned)"]
-    Core["src/core/ (Planned Pure Domain)"]
+    Core["src/core/ (Pure Domain Engine)"]
 
     Main --> Config
     Main --> Game
@@ -44,11 +44,11 @@ flowchart TD
 
 | Layer                               | May Depend On                                                                                          | Must NOT Depend On                                                                      |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
-| `src/core/` _(planned)_             | Pure TypeScript types, `src/utils/`                                                                    | `phaser`, DOM/Browser globals, `src/game/`, `src/platform/`, `src/design-system/`       |
+| `src/core/`                         | Pure TypeScript only (zero external runtime deps)                                                      | `phaser`, DOM/Browser globals, `src/game/`, `src/platform/`, `src/design-system/`       |
 | `src/platform/contracts/`           | TypeScript types only                                                                                  | `phaser`, browser globals, concrete adapters                                            |
 | `src/platform/browser/`             | `src/platform/contracts/`, browser APIs                                                                | `phaser`, `src/game/`, `src/core/`                                                      |
 | `src/platform/youtube/` _(planned)_ | `src/platform/contracts/`, `ytgame` SDK                                                                | `phaser`, `src/game/`, `src/core/`                                                      |
-| `src/design-system/`                | Tokens, Phaser (for UI primitives only)                                                                | `src/core/`, `src/platform/`                                                            |
+| `src/design-system/`                | Tokens, type-only `BottleId` from `src/core/models/BottleId`, Phaser (for UI primitives only)          | `src/core/` engine logic, `src/platform/`                                               |
 | `src/config/`                       | `src/design-system/tokens/`, `phaser` (`gameConfig.ts` only)                                           | `src/platform/` concrete implementations                                                |
 | `src/game/`                         | `phaser`, `src/core/`, `src/design-system/`, `src/config/`, `src/services/`, `src/platform/contracts/` | Concrete platform implementations (`BrowserGamePlatform`, future `YouTubeGamePlatform`) |
 | `src/main.ts`                       | Composition root — wires platform, config, services, and Phaser scenes                                 | Game rules implementation                                                               |

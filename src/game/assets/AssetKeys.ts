@@ -1,6 +1,6 @@
-import type { BottleColorId } from '../../design-system/tokens/Colors';
+import type { BottleId } from '../../core/models/BottleId';
 
-export const BOTTLE_TEXTURE_KEYS: Readonly<Record<BottleColorId, `bottle:${BottleColorId}`>> = {
+export const BOTTLE_TEXTURE_KEYS: Readonly<Record<BottleId, `bottle:${BottleId}`>> = {
   red: 'bottle:red',
   blue: 'bottle:blue',
   green: 'bottle:green',
@@ -39,7 +39,7 @@ export const ASSET_KEYS = {
   Icons: ICON_TEXTURE_KEYS,
 } as const;
 
-export type BottleTextureKey = (typeof BOTTLE_TEXTURE_KEYS)[BottleColorId];
+export type BottleTextureKey = (typeof BOTTLE_TEXTURE_KEYS)[BottleId];
 export type EnvironmentTextureKey =
   (typeof ENVIRONMENT_TEXTURE_KEYS)[keyof typeof ENVIRONMENT_TEXTURE_KEYS];
 export type EffectTextureKey = (typeof EFFECT_TEXTURE_KEYS)[keyof typeof EFFECT_TEXTURE_KEYS];
