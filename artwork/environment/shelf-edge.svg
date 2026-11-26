@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="32" viewBox="0 0 1024 32">
+  <defs>
+    <linearGradient id="edgeWood" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#9A6F44" />
+      <stop offset="48%" stop-color="#7B532E" />
+      <stop offset="100%" stop-color="#593A1E" />
+    </linearGradient>
+  </defs>
+
+  <rect x="6" y="0" width="1012" height="26" rx="8" fill="url(#edgeWood)" />
+  <line x1="18" y1="3" x2="1006" y2="3" stroke="#E8C69B" stroke-width="1.5" opacity="0.28" />
+  <rect x="16" y="24" width="992" height="7" rx="3.5" fill="#090512" opacity="0.48" />
+</svg>

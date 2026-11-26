@@ -3,15 +3,15 @@ export type BottleColorId =
 
 export type BottleSymbol =
   | 'circle'
-  | 'triangle'
-  | 'square'
-  | 'star'
   | 'diamond'
-  | 'plus'
+  | 'triangle'
+  | 'star'
+  | 'sparkle'
+  | 'square'
   | 'heart'
-  | 'hexagon'
-  | 'pentagon'
-  | 'moon';
+  | 'cross'
+  | 'stripes'
+  | 'ring';
 
 export type BottlePattern =
   | 'stripes'
@@ -84,21 +84,21 @@ export const BottleColors = {
 
 export const BottleColorTokens: readonly BottleColorToken[] = [
   { id: 'red', label: 'Red', hex: BottleColors.Red, symbol: 'circle', pattern: 'stripes' },
-  { id: 'blue', label: 'Blue', hex: BottleColors.Blue, symbol: 'triangle', pattern: 'waves' },
-  { id: 'green', label: 'Green', hex: BottleColors.Green, symbol: 'square', pattern: 'dots' },
+  { id: 'blue', label: 'Blue', hex: BottleColors.Blue, symbol: 'diamond', pattern: 'waves' },
+  { id: 'green', label: 'Green', hex: BottleColors.Green, symbol: 'triangle', pattern: 'dots' },
   { id: 'yellow', label: 'Yellow', hex: BottleColors.Yellow, symbol: 'star', pattern: 'zigzag' },
   {
     id: 'purple',
     label: 'Purple',
     hex: BottleColors.Purple,
-    symbol: 'diamond',
+    symbol: 'sparkle',
     pattern: 'diamonds',
   },
-  { id: 'orange', label: 'Orange', hex: BottleColors.Orange, symbol: 'plus', pattern: 'chevron' },
+  { id: 'orange', label: 'Orange', hex: BottleColors.Orange, symbol: 'square', pattern: 'chevron' },
   { id: 'pink', label: 'Pink', hex: BottleColors.Pink, symbol: 'heart', pattern: 'hearts' },
-  { id: 'teal', label: 'Teal', hex: BottleColors.Teal, symbol: 'hexagon', pattern: 'rings' },
-  { id: 'brown', label: 'Brown', hex: BottleColors.Brown, symbol: 'pentagon', pattern: 'grid' },
-  { id: 'silver', label: 'Silver', hex: BottleColors.Silver, symbol: 'moon', pattern: 'diagonal' },
+  { id: 'teal', label: 'Teal', hex: BottleColors.Teal, symbol: 'cross', pattern: 'rings' },
+  { id: 'brown', label: 'Brown', hex: BottleColors.Brown, symbol: 'stripes', pattern: 'grid' },
+  { id: 'silver', label: 'Silver', hex: BottleColors.Silver, symbol: 'ring', pattern: 'diagonal' },
 ] as const;
 
 export const Colors = {

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="576" viewBox="0 0 320 576">
+  <defs>
+    <radialGradient id="softHalo" cx="50%" cy="52%" r="52%">
+      <stop offset="0%" stop-color="#FBBF24" stop-opacity="0.34" />
+      <stop offset="68%" stop-color="#FBBF24" stop-opacity="0.1" />
+      <stop offset="100%" stop-color="#FBBF24" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <!-- Soft outer luminous halo -->
+  <rect x="8" y="8" width="304" height="560" rx="56" fill="url(#softHalo)" />
+</svg>

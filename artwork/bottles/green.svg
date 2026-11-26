@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="512" viewBox="0 0 256 512" role="img" aria-label="Green bottle with triangle symbol">
+  <defs>
+    <linearGradient id="glassBody-green" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#15803D" />
+      <stop offset="16%" stop-color="#4ADE80" />
+      <stop offset="48%" stop-color="#22C55E" />
+      <stop offset="86%" stop-color="#15803D" />
+      <stop offset="100%" stop-color="#86EFAC" />
+    </linearGradient>
+
+    <linearGradient id="glassVertical-green" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.22" />
+      <stop offset="30%" stop-color="#FFFFFF" stop-opacity="0.03" />
+      <stop offset="82%" stop-color="#000000" stop-opacity="0.06" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.28" />
+    </linearGradient>
+
+    <linearGradient id="capGrad-green" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#CBD5E1" />
+      <stop offset="28%" stop-color="#F8FAFC" />
+      <stop offset="70%" stop-color="#E2E8F0" />
+      <stop offset="100%" stop-color="#94A3B8" />
+    </linearGradient>
+
+    <linearGradient id="specStreak-green" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.52" />
+      <stop offset="55%" stop-color="#FFFFFF" stop-opacity="0.24" />
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0.04" />
+    </linearGradient>
+
+    <clipPath id="bottleClip-green">
+      <path d="M100 50 H156 V136 C156 174 220 194 220 250 V464 C220 492 200 508 172 508 H84 C56 508 36 492 36 464 V250 C36 194 100 174 100 136 Z" />
+    </clipPath>
+  </defs>
+
+  <!-- Main coloured glass body -->
+  <path d="M100 50 H156 V136 C156 174 220 194 220 250 V464 C220 492 200 508 172 508 H84 C56 508 36 492 36 464 V250 C36 194 100 174 100 136 Z" fill="url(#glassBody-green)" />
+  <path d="M100 50 H156 V136 C156 174 220 194 220 250 V464 C220 492 200 508 172 508 H84 C56 508 36 492 36 464 V250 C36 194 100 174 100 136 Z" fill="url(#glassVertical-green)" />
+
+  <!-- Internal glass shading, highlights and base depth -->
+  <g clip-path="url(#bottleClip-green)">
+    <!-- Subtle neck shadow under cap -->
+    <rect x="92" y="48" width="72" height="16" fill="#0F0A1A" opacity="0.26" />
+
+    <!-- Soft left curved specular highlight -->
+    <path d="M111 66 V136 C111 178 58 196 58 250 V454 C58 468 64 478 72 484" fill="none" stroke="url(#specStreak-green)" stroke-width="14" stroke-linecap="round" />
+
+    <!-- Crisp secondary shoulder gleam -->
+    <ellipse cx="78" cy="216" rx="8" ry="22" transform="rotate(24 78 216)" fill="#FFFFFF" opacity="0.34" />
+
+    <!-- Subtle right rim bounce highlight -->
+    <path d="M206 254 V460 C206 478 194 492 178 496" fill="none" stroke="#86EFAC" stroke-width="6" stroke-linecap="round" opacity="0.45" />
+
+    <!-- Glass base thickness band -->
+    <path d="M36 472 Q128 492 220 472 V512 H36 Z" fill="#0F0A1A" opacity="0.2" />
+    <path d="M68 488 Q128 502 188 488" fill="none" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" opacity="0.28" />
+  </g>
+
+  <!-- Crisp glass rim contour -->
+  <path d="M100 50 H156 V136 C156 174 220 194 220 250 V464 C220 492 200 508 172 508 H84 C56 508 36 492 36 464 V250 C36 194 100 174 100 136 Z" fill="none" stroke="#86EFAC" stroke-width="3" opacity="0.48" />
+
+  <!-- Neck collar lip -->
+  <rect x="95" y="44" width="66" height="12" rx="6" fill="#4ADE80" opacity="0.92" />
+
+  <!-- Metallic stylised bottle cap -->
+  <rect x="86" y="10" width="84" height="38" rx="11" fill="url(#capGrad-green)" />
+  <rect x="86" y="10" width="84" height="38" rx="11" fill="none" stroke="#FFFFFF" stroke-width="2" opacity="0.45" />
+  <!-- Cap subtle vertical ribs -->
+  <g stroke="#94A3B8" stroke-width="2" opacity="0.42">
+    <line x1="102" y1="16" x2="102" y2="42" />
+    <line x1="115" y1="16" x2="115" y2="42" />
+    <line x1="128" y1="16" x2="128" y2="42" />
+    <line x1="141" y1="16" x2="141" y2="42" />
+    <line x1="154" y1="16" x2="154" y2="42" />
+  </g>
+  <rect x="94" y="13" width="68" height="6" rx="3" fill="#FFFFFF" opacity="0.55" />
+
+  <!-- Frosted decorative label -->
+  <rect x="60" y="282" width="136" height="136" rx="24" fill="#FFFFFF" opacity="0.24" />
+  <rect x="60" y="282" width="136" height="136" rx="24" fill="none" stroke="rgba(255,255,255,0.34)" stroke-width="2.5" />
+
+  <!-- Accessibility symbol with subtle grounding shadow -->
+  <g transform="translate(0, 3)" opacity="0.22">
+    <path d="M128 315 L164 381 Q166 385 161 385 L95 385 Q90 385 92 381 Z" fill="#171126" />
+  </g>
+  <path d="M128 315 L164 381 Q166 385 161 385 L95 385 Q90 385 92 381 Z" fill="#FFFFFF" />
+</svg>

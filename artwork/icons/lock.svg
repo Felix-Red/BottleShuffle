@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Locked sequence slot">
+  <path d="M21 28 V21 C21 14.925 25.925 10 32 10 C38.075 10 43 14.925 43 21 V28" fill="none" stroke="#8F83A8" stroke-width="5.5" stroke-linecap="round" />
+  <rect x="14" y="27" width="36" height="27" rx="7" fill="#8F83A8" />
+  <circle cx="32" cy="39" r="3.5" fill="#1F1731" />
+  <rect x="30.25" y="40" width="3.5" height="6.5" rx="1.75" fill="#1F1731" />
+</svg>

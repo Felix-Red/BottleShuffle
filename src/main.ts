@@ -57,7 +57,9 @@ async function bootstrap(): Promise<void> {
 
   if (import.meta.env.DEV) {
     const params = new URLSearchParams(globalThis.location.search);
-    if (params.get('scene') === 'showcase') {
+    const requestedScene = params.get('scene');
+
+    if (requestedScene === 'showcase') {
       const { ComponentShowcaseScene, parseShowcasePageParam } =
         await import('./game/scenes/ComponentShowcaseScene');
       const initialPage = parseShowcasePageParam(params.get('page'));
@@ -66,6 +68,16 @@ async function bootstrap(): Promise<void> {
         new BootScene(platform, initialSceneKey),
         new HomeScene(platform),
         new ComponentShowcaseScene(platform, initialPage),
+      );
+    } else if (requestedScene === 'assets') {
+      const { AssetShowcaseScene, parseAssetShowcasePageParam } =
+        await import('./game/scenes/AssetShowcaseScene');
+      const initialPage = parseAssetShowcasePageParam(params.get('page'));
+      initialSceneKey = SCENE_KEYS.ASSET_SHOWCASE;
+      scenes.push(
+        new BootScene(platform, initialSceneKey),
+        new HomeScene(platform),
+        new AssetShowcaseScene(platform, initialPage),
       );
     }
   }

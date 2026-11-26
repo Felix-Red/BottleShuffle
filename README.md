@@ -29,18 +29,18 @@ The game runs 100% client-side with locally bundled fonts and assets and zero ru
 Bottle Shuffle follows pragmatic Clean Architecture and SOLID principles:
 
 - **Core Game Logic (`src/core/`)** — Planned pure TypeScript domain logic (puzzle generation, swap validation, match counting, scoring, levels) completely independent of Phaser, browser APIs, and platform SDKs.
-- **Game Presentation (`src/game/`)** — Phaser 3 scenes, visual components, animations, and input adapters. Currently contains `BootScene`, a temporary `HomeScene`, and the development-only `ComponentShowcaseScene`.
-- **Design System (`src/design-system/`)** — Centralised tokens (`Colors`, `Typography`, `Dimens`, `Shapes`, `Elevation`, `Motion`, `Breakpoints`), `GameTheme`, and reusable Phaser UI components (buttons, cards, indicators, controls, overlays, layout).
+- **Game Presentation (`src/game/`)** — Phaser 3 scenes, visual assets (`AssetKeys`, `AssetManifest`, `BottleCatalog`), reusable bottle & environment components (`BottleSprite`, `BottleRack`, `HiddenSequenceRack`, `GameBackground`), and development-only showcase scenes.
+- **Design System (`src/design-system/`)** — Centralised tokens (`Colors`, `Typography`, `Dimens`, `Shapes`, `Elevation`, `Motion`, `Breakpoints`), `GameTheme`, and reusable Phaser UI components.
 - **Platform Layer (`src/platform/`)** — `GamePlatform` contract and environment-specific adapters (`BrowserGamePlatform` for local development, ready for future `YouTubeGamePlatform`).
 - **Configuration (`src/config/`)** — Centralised Phaser game configuration, viewport metrics, and application metadata.
 
-See [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) and [docs/DESIGN_SYSTEM.md](./docs/DESIGN_SYSTEM.md) for full details.
+See [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md), [docs/DESIGN_SYSTEM.md](./docs/DESIGN_SYSTEM.md), [docs/ASSETS.md](./docs/ASSETS.md), and [docs/GAME_ENVIRONMENT.md](./docs/GAME_ENVIRONMENT.md) for full details.
 
 ## Target Platform: YouTube Playables
 
 The architecture is designed from the outset around the [YouTube Playables technical and certification requirements](https://developers.google.com/youtube/gaming/playables):
 
-- Relative asset paths (`base: './'`) and locally bundled dependencies and fonts (`Fredoka` and `Nunito` WOFF2 with OFL licence notices).
+- Relative asset paths (`base: './'`, `./assets/...`) and locally bundled fonts and textures (zero external CDN runtime calls).
 - Landscape-first reference resolution (`1280 × 720`) with responsive `Phaser.Scale.RESIZE` scaling that adapts to both landscape and portrait viewports without forcing device orientation.
 - Touch and mouse input support with ≥48px minimum interactive touch targets.
 - Platform lifecycle hooks abstracted behind `GamePlatform`.
@@ -75,24 +75,30 @@ npm install
 | `npm run build`        | Type-check and create a production build in `dist/`  |
 | `npm run preview`      | Preview the production build locally                 |
 
-### Accessing the Component Showcase (Development Only)
+### Development Showcases (Development Only)
 
-While running `npm run dev`, open the development-only showcase route in your browser:
+While running `npm run dev`, two development-only inspection scenes are available (both gated behind `import.meta.env.DEV` dynamic imports and excluded from production builds):
+
+#### Design System Component Showcase
 
 ```text
 http://localhost:5173/?scene=showcase
 ```
 
-You can also deep-link directly to a specific showcase tab using the `page` query parameter:
+Optional `?page=` values: `colors`, `typography`, `buttons`, `cards`, `indicators`, `overlays`.
 
-- `/?scene=showcase&page=colors` — Brand, surface, semantic, and 10 bottle colour tokens
-- `/?scene=showcase&page=typography` — Fredoka & Nunito typography scale
-- `/?scene=showcase&page=buttons` — All 5 button variants plus interactive disabled, loading, and focus states
-- `/?scene=showcase&page=cards` — `GameCard`, `LevelCard` (all states), and `StatCard`
-- `/?scene=showcase&page=indicators` — Interactive `MatchCounter`, `ProgressBar`, `StarRating`, `LoadingIndicator`, and `ToggleSwitch`
-- `/?scene=showcase&page=overlays` — `Modal`, `ConfirmDialog`, `Toast` variants, `GamePanel`, and motion presets
+#### Bottle Assets & Environment Showcase
 
-The showcase is gated behind `import.meta.env.DEV` with dynamic import so it is excluded from production entry flows and tree-shaken out of production builds (`npm run build`).
+```text
+http://localhost:5173/?scene=assets
+```
+
+Optional `?page=` values:
+
+- `/?scene=assets&page=environment` — Complete playing environment (background, 10 bottles on wooden shelf, concealed compartment, demo MatchCounter)
+- `/?scene=assets&page=collection` — All 10 bottles with names, hex tokens, and accessibility symbols
+- `/?scene=assets&page=states` — All 6 `BottleSprite` interaction states (`default`, `hovered`, `pressed`, `selected`, `swapping`, `disabled`)
+- `/?scene=assets&page=rack` — Interactive `BottleRack` & `HiddenSequenceRack` switcher (`3`, `4`, `5`, `6`, `8`, `10` bottles) plus empty/highlighted slot toggles
 
 ### Production Build
 
@@ -106,5 +112,6 @@ The compiled bundle is emitted to `dist/` using relative asset paths (`./assets/
 
 - **Task 01 — Project Setup and Architecture:** Complete.
 - **Task 02 — Design System and Reusable Components:** Complete.
+- **Task 03 — Bottle Assets and Visual Environment:** Complete.
 
-Gameplay mechanics, final UI screens, bottle art, audio, and YouTube Playables SDK integration are tracked in [docs/PROGRESS.md](./docs/PROGRESS.md).
+Core puzzle logic, level progression, gameplay screen, audio, and YouTube Playables SDK integration are tracked in [docs/PROGRESS.md](./docs/PROGRESS.md).
