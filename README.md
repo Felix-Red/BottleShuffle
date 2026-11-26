@@ -28,7 +28,7 @@ The game runs 100% client-side with locally bundled fonts and assets and zero ru
 
 Bottle Shuffle follows pragmatic Clean Architecture and SOLID principles:
 
-- **Core Game Logic (`src/core/`)** — Planned pure TypeScript domain logic (puzzle generation, swap validation, match counting, scoring, levels) completely independent of Phaser, browser APIs, and platform SDKs.
+- **Core Game Logic (`src/core/`)** — Pure TypeScript puzzle generation engine, canonical `BottleId` models, Mulberry32 seeded PRNG, Fisher-Yates shuffle, permutation cycle swap-distance math, difficulty definitions, and centralised validation — zero Phaser or browser dependencies.
 - **Game Presentation (`src/game/`)** — Phaser 3 scenes, visual assets (`AssetKeys`, `AssetManifest`, `BottleCatalog`), reusable bottle & environment components (`BottleSprite`, `BottleRack`, `HiddenSequenceRack`, `GameBackground`), and development-only showcase scenes.
 - **Design System (`src/design-system/`)** — Centralised tokens (`Colors`, `Typography`, `Dimens`, `Shapes`, `Elevation`, `Motion`, `Breakpoints`), `GameTheme`, and reusable Phaser UI components.
 - **Platform Layer (`src/platform/`)** — `GamePlatform` contract and environment-specific adapters (`BrowserGamePlatform` for local development, ready for future `YouTubeGamePlatform`).
@@ -62,18 +62,19 @@ npm install
 
 ### Development Commands
 
-| Command                | Description                                          |
-| ---------------------- | ---------------------------------------------------- |
-| `npm run dev`          | Start the Vite development server                    |
-| `npm run typecheck`    | Run strict TypeScript type checking (`tsc --noEmit`) |
-| `npm run lint`         | Run ESLint across the codebase                       |
-| `npm run lint:fix`     | Automatically fix fixable ESLint issues              |
-| `npm run format`       | Format files with Prettier                           |
-| `npm run format:check` | Verify formatting with Prettier                      |
-| `npm test`             | Run unit tests once via Vitest                       |
-| `npm run test:watch`   | Run Vitest in watch mode                             |
-| `npm run build`        | Type-check and create a production build in `dist/`  |
-| `npm run preview`      | Preview the production build locally                 |
+| Command                                                       | Description                                                 |
+| ------------------------------------------------------------- | ----------------------------------------------------------- |
+| `npm run dev`                                                 | Start the Vite development server                           |
+| `npm run typecheck`                                           | Run strict TypeScript type checking (`tsc --noEmit`)        |
+| `npm run lint`                                                | Run ESLint across the codebase                              |
+| `npm run lint:fix`                                            | Automatically fix fixable ESLint issues                     |
+| `npm run format`                                              | Format files with Prettier                                  |
+| `npm run format:check`                                        | Verify formatting with Prettier                             |
+| `npm test`                                                    | Run unit tests once via Vitest                              |
+| `npm run test:watch`                                          | Run Vitest in watch mode                                    |
+| `npm run build`                                               | Type-check and create a production build in `dist/`         |
+| `npm run preview`                                             | Preview the production build locally                        |
+| `npm run puzzle:inspect -- --difficulty expert --seed demo-1` | Inspect a deterministically generated puzzle in development |
 
 ### Development Showcases (Development Only)
 
@@ -113,5 +114,6 @@ The compiled bundle is emitted to `dist/` using relative asset paths (`./assets/
 - **Task 01 — Project Setup and Architecture:** Complete.
 - **Task 02 — Design System and Reusable Components:** Complete.
 - **Task 03 — Bottle Assets and Visual Environment:** Complete.
+- **Task 04 — Puzzle Generation Engine:** Complete.
 
-Core puzzle logic, level progression, gameplay screen, audio, and YouTube Playables SDK integration are tracked in [docs/PROGRESS.md](./docs/PROGRESS.md).
+Gameplay swapping mechanics, scoring, level progression, audio, and YouTube Playables SDK integration are tracked in [docs/PROGRESS.md](./docs/PROGRESS.md).

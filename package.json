@@ -14,7 +14,8 @@
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "puzzle:inspect": "node scripts/inspect-puzzle.mjs"
   },
   "dependencies": {
     "phaser": "^3.90.0"

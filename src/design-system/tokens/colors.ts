@@ -1,5 +1,6 @@
-export type BottleColorId =
-  'red' | 'blue' | 'green' | 'yellow' | 'purple' | 'orange' | 'pink' | 'teal' | 'brown' | 'silver';
+import type { BottleId } from '../../core/models/BottleId';
+
+export type BottleColorId = BottleId;
 
 export type BottleSymbol =
   | 'circle'

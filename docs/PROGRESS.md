@@ -39,9 +39,28 @@ This document tracks completed milestones, technical notes, and planned upcoming
 - **Canvas accessibility:** Phaser renders inside a single `<canvas>`; `BottleCatalogEntry.accessibleLabel` provides structured labels for future keyboard navigation or DOM accessibility overlays.
 - **YouTube Playables SDK:** `YouTubeGamePlatform` and official SDK Test Suite verification remain deferred to the dedicated platform integration task.
 
+### Task 04: Puzzle Generation Engine — Completed
+
+- Implemented pure TypeScript domain engine under `src/core/` with zero Phaser, DOM, or browser dependencies:
+  - Canonical bottle identity ownership in `src/core/models/BottleId.ts`, referenced by `Colors.ts`, `AssetKeys.ts`, and `BottleCatalog.ts` as a single source of truth.
+  - Immutable models (`Bottle`, `Difficulty`, `PuzzleConfig`, `Puzzle`, `PublicPuzzleView`, `PuzzleStatus`, `PuzzleState`) and typed `PuzzleError`.
+  - Centralised difficulty definitions in `src/core/levels/DifficultyConfig.ts` (`beginner: 3`, `easy: 4`, `normal: 5`, `intermediate: 6`, `hard: 8`, `expert: 10`).
+  - Deterministic seeded PRNG (`SeededRandom` using Mulberry32 + FNV-1a seed hashing and explicit seed validation/normalisation policy) and generic Fisher-Yates `shuffle`.
+  - Pure permutation cycle decomposition (`calculateMinimumSwapDistance`) and match counting (`countMatchingPositions`).
+  - Bounded `SequenceGenerator` with deterministic `O(n)` constructive fallback for rare valid constraints and strict rejection of impossible configurations (including `n - 1` match counts and infeasible swap/match combinations).
+  - Centralised `PuzzleValidator` and `PuzzleGenerator` producing deeply frozen deterministic puzzles and `PublicPuzzleView` / `PuzzleState` projections.
+- Added development-only diagnostic CLI (`npm run puzzle:inspect`, `scripts/inspect-puzzle.mjs`) completely outside the production bundle.
+- Added 6 core test suites in `tests/unit/core/` including a deterministic **1,260-puzzle stress test** across all 6 difficulties and custom constraints.
+- Authored `docs/PUZZLE_ENGINE.md` and updated `docs/ARCHITECTURE.md`, `README.md`, and `docs/PROGRESS.md`.
+
+#### Known Limitations & Assumptions (Task 04)
+
+- **Non-cryptographic PRNG:** Mulberry32 + FNV-1a is intended for reproducible game puzzles, not cryptographic security; because the game is client-side, target sequences are protected against accidental UI leakage rather than browser DevTools inspection.
+- **No gameplay loop yet:** Bottle swapping state transitions, timers, move history, scoring, level unlocking, and gameplay scene wiring are intentionally deferred to Task 05+.
+
 ## Upcoming Tasks (Planned)
 
-- **Core Game Engine (`src/core/`):** Bottle sequence models, deterministic shuffle, swap mechanics, match count evaluation, win detection, and thorough unit tests.
+- **Gameplay State & Swap Controller (`src/core/` & `src/game/`):** Immutable swap transitions, match feedback evaluation, move tracking, and win detection wired into an interactive gameplay scene.
 - **Level & Difficulty Progression:** Level definitions, bottle counts, scoring/move tracking, and persistence service built on `GamePlatform`.
 - **Interactive Gameplay Scene:** Wiring `BottleRack`, `BottleSprite`, `HiddenSequenceRack`, `MatchCounter`, swap animations, and input handling to `src/core/`.
 - **Audio System:** Local SFX/music playback respecting `GamePlatform` audio preferences and pause/resume lifecycle events.
