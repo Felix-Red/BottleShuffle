@@ -5,6 +5,7 @@ export type DesignIconName =
   | 'back'
   | 'close'
   | 'play'
+  | 'pause'
   | 'restart'
   | 'settings'
   | 'sound'
@@ -90,6 +91,20 @@ export function drawIcon(
         cx + r * 0.78,
         cy,
       );
+      break;
+    }
+    case 'pause': {
+      const barW = Math.max(3, r * 0.42);
+      const barH = r * 1.36;
+      const gap = r * 0.28;
+      graphics.fillRoundedRect(
+        cx - gap - barW,
+        cy - barH / 2,
+        barW,
+        barH,
+        Math.max(1.5, barW * 0.35),
+      );
+      graphics.fillRoundedRect(cx + gap, cy - barH / 2, barW, barH, Math.max(1.5, barW * 0.35));
       break;
     }
     case 'restart': {

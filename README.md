@@ -77,6 +77,26 @@ npm install
 | `npm run puzzle:inspect -- --difficulty expert --seed demo-1`                  | Inspect a deterministically generated puzzle in development |
 | `npm run gameplay:simulate -- --difficulty normal --seed demo --reveal-target` | Simulate a full gameplay engine session in development      |
 
+### Playing the Current Development Build
+
+```bash
+npm install
+npm run dev
+```
+
+Open `http://localhost:5173/` in a desktop or mobile browser:
+
+1. Choose a difficulty on the temporary home screen (**Beginner 3**, **Easy 4**, **Normal 5**, **Intermediate 6**, **Hard 8**, or **Expert 10** bottles) and press **Play Puzzle**.
+2. Tap or click any bottle to select it, then tap a second bottle to swap their positions (or use `ArrowLeft`/`ArrowRight` + `Enter`/`Space` on keyboard, and `Escape` to deselect or pause).
+3. Watch the aggregate **Correct Matches** counter update after each swap and deduce the hidden sequence until all bottles match.
+4. Use the top-left **Pause** button or top-right **Restart** button (with confirmation) at any time, and resize the window freely between landscape and portrait orientations.
+
+In development mode only, you can also launch directly into a seeded puzzle via:
+
+```text
+http://localhost:5173/?scene=game&difficulty=expert&seed=demo-2026
+```
+
 ### Development Showcases (Development Only)
 
 While running `npm run dev`, two development-only inspection scenes are available (both gated behind `import.meta.env.DEV` dynamic imports and excluded from production builds):
@@ -117,5 +137,6 @@ The compiled bundle is emitted to `dist/` using relative asset paths (`./assets/
 - **Task 03 — Bottle Assets and Visual Environment:** Complete.
 - **Task 04 — Puzzle Generation Engine:** Complete.
 - **Task 05 — Bottle Swapping and Match Calculation:** Complete.
+- **Task 06 — Gameplay Screen and Engine Integration:** Complete.
 
-Interactive gameplay scene, swap animations, scoring, level progression, audio, and YouTube Playables SDK integration are tracked in [docs/PROGRESS.md](./docs/PROGRESS.md).
+Advanced animations, audio, scoring, level progression, persistence, and YouTube Playables SDK integration are tracked in [docs/PROGRESS.md](./docs/PROGRESS.md).
