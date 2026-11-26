@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="slotGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1B142C" />
+      <stop offset="100%" stop-color="#271E3C" />
+    </linearGradient>
+  </defs>
+
+  <rect x="6" y="6" width="116" height="116" rx="18" fill="url(#slotGrad)" />
+  <rect x="8" y="8" width="112" height="18" rx="12" fill="#0B0714" opacity="0.35" />
+  <rect x="6" y="6" width="116" height="116" rx="18" fill="none" stroke="#4C405F" stroke-width="2.5" opacity="0.9" />
+</svg>

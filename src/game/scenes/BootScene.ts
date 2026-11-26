@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import type { GamePlatform } from '../../platform/contracts/GamePlatform';
+import { queueAssetManifest } from '../assets/AssetManifest';
 import { SCENE_KEYS, type SceneKey } from './sceneKeys';
 
 export class BootScene extends Phaser.Scene {
@@ -10,6 +11,10 @@ export class BootScene extends Phaser.Scene {
     super({ key: SCENE_KEYS.BOOT });
     this.platform = platform;
     this.initialSceneKey = initialSceneKey;
+  }
+
+  public preload(): void {
+    queueAssetManifest(this);
   }
 
   public create(): void {
