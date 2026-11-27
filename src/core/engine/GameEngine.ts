@@ -1,5 +1,6 @@
 import { GameError } from '../errors/GameError';
 import { PuzzleError } from '../errors/PuzzleError';
+import type { DifficultyId } from '../models/Difficulty';
 import type { GameAction } from '../models/GameAction';
 import type { GameTransitionResult } from '../models/GameEvent';
 import { toPublicGameState, type PublicGameState } from '../models/PublicGameState';
@@ -8,6 +9,14 @@ import type { PuzzleState } from '../models/PuzzleState';
 import { reduceGameState } from '../state/GameReducer';
 import { createReadyGameState } from '../state/GameStateFactory';
 import { assertValidPuzzle } from './PuzzleValidator';
+import { calculateMinimumSwapDistance } from './SwapDistance';
+
+export interface CompletedPuzzleScoringMetadata {
+  readonly puzzleId: string;
+  readonly difficulty: DifficultyId;
+  readonly bottleCount: number;
+  readonly minimumRequiredSwaps: number;
+}
 
 function cloneFrozenPuzzle(puzzle: Puzzle): Puzzle {
   return Object.freeze({
@@ -49,6 +58,25 @@ export class GameEngine {
 
   public getPublicState(): PublicGameState {
     return toPublicGameState(this.state);
+  }
+
+  /**
+   * Returns original puzzle minimumRequiredSwaps and scoring metadata ONLY after
+   * the puzzle reaches the 'completed' status, keeping swap distance private during play.
+   */
+  public getCompletedScoringMetadata(): CompletedPuzzleScoringMetadata | null {
+    if (this.state.status !== 'completed') {
+      return null;
+    }
+    return Object.freeze({
+      puzzleId: this.puzzle.id,
+      difficulty: this.puzzle.difficulty,
+      bottleCount: this.puzzle.bottleCount,
+      minimumRequiredSwaps: calculateMinimumSwapDistance(
+        this.puzzle.startingSequence,
+        this.puzzle.targetSequence,
+      ),
+    });
   }
 
   public dispatch(action: GameAction): GameTransitionResult {

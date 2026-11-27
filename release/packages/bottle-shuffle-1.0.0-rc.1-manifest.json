@@ -1,0 +1,34 @@
+{
+  "gameTitle": "Bottle Shuffle",
+  "applicationVersion": "1.0.0-rc.1",
+  "releaseIdentifier": "bottle-shuffle-1.0.0-rc.1",
+  "gitCommit": "5f30d4a1379787041bab7fc54412eda422de40d8",
+  "gitCommitShort": "5f30d4a",
+  "buildTimestamp": "2026-11-27T17:09:41.786Z",
+  "nodeVersion": "v26.0.0",
+  "npmVersion": "11.12.1",
+  "buildConfiguration": "vite build --mode youtube",
+  "versions": {
+    "saveSchemaVersion": 1,
+    "puzzleGeneratorVersion": "1.0.0",
+    "scoringPolicyVersion": 1,
+    "campaignCatalogVersion": "1.0.0"
+  },
+  "package": {
+    "filename": "bottle-shuffle-1.0.0-rc.1.zip",
+    "entryPoint": "index.html",
+    "fileCount": 47,
+    "uncompressedBytes": 2404674,
+    "compressedBytes": 1031852,
+    "sha256": "51713cb9e8c935ae340d51dc50371df9fa50b79fbb4e09070f0c708c66f91466"
+  },
+  "verificationStatus": {
+    "staticChecksAndUnitSuite": "verified",
+    "campaignSolvability50Of50": "verified",
+    "productionBuildAndAssetAudit": "verified",
+    "playwrightProductionE2E": "verified",
+    "officialYouTubeTestSuite": "blocked_external_portal_access",
+    "physicalMobileDevices": "not_tested",
+    "humanPlaytesting": "not_tested"
+  }
+}

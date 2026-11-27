@@ -45,7 +45,7 @@ The architecture is designed from the outset around the [YouTube Playables techn
 - Touch and mouse input support with ≥48px minimum interactive touch targets.
 - Platform lifecycle hooks abstracted behind `GamePlatform`.
 
-> **Note:** Actual YouTube Playables SDK (`ytgame`) integration is intentionally deferred to a later task.
+> **Note:** Official YouTube Playables SDK v1 (`https://www.youtube.com/game_api/v1`) is integrated behind `PlatformFactory` / `YouTubePlatform` / `YouTubeSaveStorage`, while standalone local development runs cleanly on `BrowserGamePlatform` / `BrowserSaveStorage`. See [docs/YOUTUBE_PLAYABLES.md](./docs/YOUTUBE_PLAYABLES.md) for Test Suite verification and publishing prerequisites.
 
 ## Getting Started
 
@@ -62,20 +62,35 @@ npm install
 
 ### Development Commands
 
-| Command                                                                        | Description                                                 |
-| ------------------------------------------------------------------------------ | ----------------------------------------------------------- |
-| `npm run dev`                                                                  | Start the Vite development server                           |
-| `npm run typecheck`                                                            | Run strict TypeScript type checking (`tsc --noEmit`)        |
-| `npm run lint`                                                                 | Run ESLint across the codebase                              |
-| `npm run lint:fix`                                                             | Automatically fix fixable ESLint issues                     |
-| `npm run format`                                                               | Format files with Prettier                                  |
-| `npm run format:check`                                                         | Verify formatting with Prettier                             |
-| `npm test`                                                                     | Run unit tests once via Vitest                              |
-| `npm run test:watch`                                                           | Run Vitest in watch mode                                    |
-| `npm run build`                                                                | Type-check and create a production build in `dist/`         |
-| `npm run preview`                                                              | Preview the production build locally                        |
-| `npm run puzzle:inspect -- --difficulty expert --seed demo-1`                  | Inspect a deterministically generated puzzle in development |
-| `npm run gameplay:simulate -- --difficulty normal --seed demo --reveal-target` | Simulate a full gameplay engine session in development      |
+| Command                                                                        | Description                                                    |
+| ------------------------------------------------------------------------------ | -------------------------------------------------------------- |
+| `npm run dev`                                                                  | Start the Vite development server                              |
+| `npm run typecheck`                                                            | Run strict TypeScript type checking (`tsc --noEmit`)           |
+| `npm run lint`                                                                 | Run ESLint across the codebase                                 |
+| `npm run lint:fix`                                                             | Automatically fix fixable ESLint issues                        |
+| `npm run format`                                                               | Format files with Prettier                                     |
+| `npm run format:check`                                                         | Verify formatting with Prettier                                |
+| `npm run test`                                                                 | Run unit & integration tests once via Vitest                   |
+| `npm run test:coverage`                                                        | Run Vitest suite with v8 line & branch coverage report         |
+| `npm run test:e2e`                                                             | Run Playwright E2E suite against served production `dist/`     |
+| `npm run test:stress`                                                          | Run 12,000-puzzle deterministic stress test                    |
+| `npm run validate:campaign`                                                    | Validate & programmatically solve all 50 campaign levels       |
+| `npm run validate:assets`                                                      | Verify all runtime assets (no missing/unused/duplicates)       |
+| `npm run analyse:bundle`                                                       | Print detailed production `dist/` category & file breakdown    |
+| `npm run verify:build`                                                         | Run YouTube Playables production bundle compliance audit       |
+| `npm run validate:metadata`                                                    | Validate release metadata, version sync & promo PNGs           |
+| `npm run verify:release`                                                       | Run release notice, changelog, dependency & dist audit         |
+| `npm run package:release`                                                      | Package reproducible YouTube Playables ZIP, SHA-256 & manifest |
+| `npm run smoke:release`                                                        | Verify SHA-256 & smoke-test extracted release ZIP over HTTP    |
+| `npm run release:check`                                                        | Run full pre-packaging release verification gate               |
+| `npm run qa`                                                                   | Run full deterministic QA gate (lint, types, tests, build)     |
+| `npm run test:watch`                                                           | Run Vitest in watch mode                                       |
+| `npm run build`                                                                | Type-check and create a production build in `dist/`            |
+| `npm run build:youtube`                                                        | Build and audit the YouTube Playables bundle in `dist/`        |
+| `npm run preview`                                                              | Preview the production build locally                           |
+| `npm run puzzle:inspect -- --difficulty expert --seed demo-1`                  | Inspect a deterministically generated puzzle in development    |
+| `npm run gameplay:simulate -- --difficulty normal --seed demo --reveal-target` | Simulate a full gameplay engine session in development         |
+| `npm run levels:calibrate`                                                     | Generate and calibrate all 50 campaign levels in development   |
 
 ### Playing the Current Development Build
 
@@ -86,14 +101,18 @@ npm run dev
 
 Open `http://localhost:5173/` in a desktop or mobile browser:
 
-1. Choose a difficulty on the temporary home screen (**Beginner 3**, **Easy 4**, **Normal 5**, **Intermediate 6**, **Hard 8**, or **Expert 10** bottles) and press **Play Puzzle**.
-2. Tap or click any bottle to select it, then tap a second bottle to swap their positions (or use `ArrowLeft`/`ArrowRight` + `Enter`/`Space` on keyboard, and `Escape` to deselect or pause).
-3. Watch the aggregate **Correct Matches** counter update after each swap and deduce the hidden sequence until all bottles match.
-4. Use the top-left **Pause** button or top-right **Restart** button (with confirmation) at any time, and resize the window freely between landscape and portrait orientations.
+1. **Immediate Campaign Play & Onboarding:** On the production Home screen, press the primary **PLAY** (or **CONTINUE** / **PLAY AGAIN**) button. First-time players automatically experience the short interactive tutorial (with **Skip** always available) before launching directly into their requested campaign level.
+2. **Level Selection & Chapters:** Press **LEVELS** (or tap the **Campaign Progress** card) to open the dedicated chapter-based Level Selection screen (`Chapter 1`–`Chapter 6`), browse chapter artwork and progress, preview unlocked or completed levels with personal best records, and launch or replay any unlocked puzzle.
+3. **Practice Mode:** Press **PRACTICE** to pick any of the 6 difficulties (**Beginner 3** through **Expert 10**) and play standalone puzzles without affecting campaign progress.
+4. **Settings & Replay Tutorial:** Press the top-right gear icon to toggle **Reduced Motion** across all scenes or select **How to Play** to replay the interactive tutorial at any time without affecting campaign progress.
+5. **Gameplay Controls:** Tap or click two bottles to swap them (or use `ArrowLeft`/`ArrowRight` + `Enter`/`Space` on keyboard, and `Escape` to deselect, close dialogs, or pause).
 
-In development mode only, you can also launch directly into a seeded puzzle via:
+In development mode only, you can also launch directly into the tutorial, level selection, a campaign level, or a seeded practice puzzle via:
 
 ```text
+http://localhost:5173/?scene=tutorial
+http://localhost:5173/?scene=levels
+http://localhost:5173/?scene=game&level=level-001
 http://localhost:5173/?scene=game&difficulty=expert&seed=demo-2026
 ```
 
@@ -130,6 +149,38 @@ http://localhost:5173/?scene=animations
 
 Supports live previews for hover, press, select/deselect, adjacent/long-distance/cross-row curved swaps, dynamic shadows, match counter deltas (`+2`, `-1`, `No change`), move counter pulse, bounded sparkle/confetti bursts, victory celebration, modal transitions, plus **Reduced Motion** (`&reduced=1`) and **Slow Motion (0.35×)** (`&slow=1`) toggles.
 
+#### Audio & Haptics Showcase
+
+```text
+http://localhost:5173/?scene=audio
+```
+
+Previews all 13 registered sound effects, Menu/Gameplay music loops, autoplay unlock status, independent Music/SFX/Vibration settings toggles, simulated platform audio mute, lifecycle suspension/resumption, and capability-aware haptic patterns.
+
+#### Save-Data Diagnostics Showcase
+
+```text
+http://localhost:5173/?scene=save
+```
+
+Runs against an isolated in-memory storage adapter (never touching player `localStorage`) to inspect schema version, revisions, UTF-8 byte sizes, save status, and simulate valid fixtures, missing saves, corrupted JSON, invalid settings, unsupported future `v99` schemas, write failures, delayed writes, and resets.
+
+#### Responsive Layout Diagnostics Showcase
+
+```text
+http://localhost:5173/?scene=responsive
+```
+
+Previews simulated viewport presets (`320×480` through `1280×720` or live container), bottle counts (`3..10`), simulated notch safe-area insets, cyan region bounds and green non-overlapping hit-area outlines, effective DPR capping, and reduced-motion state.
+
+#### Advertising Diagnostics Showcase
+
+```text
+http://localhost:5173/?scene=ads
+```
+
+Runs against an isolated mock advertising provider and synthetic transition/progression context (never mutating real saves or campaign progress) to inspect platform capabilities, placement policy, `AdRequestState`, navigation transactions, and simulate eligible/ineligible interstitials, unavailability, SDK rejection, delayed responses, synthetic rewarded grants, and host pause/resume.
+
 ### Production Build
 
 ```bash
@@ -147,5 +198,18 @@ The compiled bundle is emitted to `dist/` using relative asset paths (`./assets/
 - **Task 05 — Bottle Swapping and Match Calculation:** Complete.
 - **Task 06 — Gameplay Screen and Engine Integration:** Complete.
 - **Task 07 — Animations and Interaction Feedback:** Complete.
+- **Task 08 — Difficulty and Level Progression:** Complete.
+- **Task 09 — Production Home Screen:** Complete.
+- **Task 10 — Production Level Selection Screen:** Complete.
+- **Task 11 — Interactive Tutorial and First-Time Player Experience:** Complete.
+- **Task 12 — Victory Screen, Scoring and Achievement Feedback:** Complete.
+- **Task 13 — Production Pause Menu and Centralised Settings:** Complete.
+- **Task 14 — Sound Effects, Background Music and Haptic Feedback:** Complete.
+- **Task 15 — Progress Persistence and Save-Data Architecture:** Complete.
+- **Task 16 — Responsive Layouts and Cross-Device Optimisation:** Complete.
+- **Task 17 — YouTube Playables SDK Integration:** Complete.
+- **Task 18 — Advertising and Monetisation Integration:** Complete.
+- **Task 19 — Comprehensive Testing, Quality Assurance and Performance Optimisation:** Complete.
+- **Task 20 — Production Release, Packaging and YouTube Playables Certification Preparation (`v1.0.0-rc.1`):** Complete (release candidate generated and internally verified; pending manual official Playables Test Suite, owner metadata values, physical mobile QA, human playtesting, and Developer Portal submission).
 
-Audio, scoring, level progression, persistence, final screens, and YouTube Playables SDK integration are tracked in [docs/PROGRESS.md](./docs/PROGRESS.md).
+See [docs/RELEASE_REPORT.md](./docs/RELEASE_REPORT.md), [docs/RELEASE_PROCESS.md](./docs/RELEASE_PROCESS.md), [docs/CERTIFICATION_CHECKLIST.md](./docs/CERTIFICATION_CHECKLIST.md), [docs/SUBMISSION_GUIDE.md](./docs/SUBMISSION_GUIDE.md), [docs/KNOWN_LIMITATIONS.md](./docs/KNOWN_LIMITATIONS.md), [CHANGELOG.md](./CHANGELOG.md), [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md), [docs/QA_REPORT.md](./docs/QA_REPORT.md), [docs/PERFORMANCE_REPORT.md](./docs/PERFORMANCE_REPORT.md), [docs/DEFECT_REGISTER.md](./docs/DEFECT_REGISTER.md), [docs/ACCESSIBILITY_AUDIT.md](./docs/ACCESSIBILITY_AUDIT.md), [docs/QA_TEST_PLAN.md](./docs/QA_TEST_PLAN.md), [docs/MONETIZATION.md](./docs/MONETIZATION.md), [docs/ADVERTISING_TEST_REPORT.md](./docs/ADVERTISING_TEST_REPORT.md), [docs/YOUTUBE_PLAYABLES.md](./docs/YOUTUBE_PLAYABLES.md), [docs/PLATFORM_COMPLIANCE.md](./docs/PLATFORM_COMPLIANCE.md), [docs/SDK_TEST_REPORT.md](./docs/SDK_TEST_REPORT.md), [docs/RESPONSIVE_LAYOUT.md](./docs/RESPONSIVE_LAYOUT.md), [docs/PERSISTENCE.md](./docs/PERSISTENCE.md), [docs/AUDIO.md](./docs/AUDIO.md), [docs/SCORING.md](./docs/SCORING.md), [docs/VICTORY_SCREEN.md](./docs/VICTORY_SCREEN.md), [docs/SETTINGS.md](./docs/SETTINGS.md), and [docs/GAMEPLAY_LIFECYCLE.md](./docs/GAMEPLAY_LIFECYCLE.md) for system documentation.

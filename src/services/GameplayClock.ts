@@ -42,6 +42,7 @@ export class GameplayClock {
   private manualPaused = false;
   private modalSuspended = false;
   private platformSuspended = false;
+  private lifecycleSuspended = false;
 
   private accumulatedMs = 0;
   private activeSegmentStartMs: number | null = null;
@@ -86,6 +87,14 @@ export class GameplayClock {
     this.syncRunningState();
   }
 
+  public setLifecycleSuspended(suspended: boolean): void {
+    if (this.lifecycleSuspended === suspended) {
+      return;
+    }
+    this.lifecycleSuspended = suspended;
+    this.syncRunningState();
+  }
+
   public complete(): void {
     if (this.completed) {
       return;
@@ -126,7 +135,8 @@ export class GameplayClock {
       !this.completed &&
       !this.manualPaused &&
       !this.modalSuspended &&
-      !this.platformSuspended
+      !this.platformSuspended &&
+      !this.lifecycleSuspended
     );
   }
 

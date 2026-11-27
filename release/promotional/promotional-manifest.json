@@ -1,0 +1,127 @@
+{
+  "generatedAt": "2026-11-27T17:16:22.377Z",
+  "officialRequirementNote": "Public YouTube Playables documentation requires thumbnails across multiple aspect ratios with zero third-party/YouTube branding or misleading visuals; exact per-slot pixel constraints are displayed inside the authenticated Playables Developer Portal Details step.",
+  "assets": [
+    {
+      "filename": "release/promotional/icons/icon-512x512.png",
+      "assetType": "icon",
+      "aspectRatio": "1:1",
+      "requiredDimensionsNote": "Confirm exact pixel slots inside authenticated YouTube Playables Developer Portal Details step",
+      "actualDimensions": "512x512",
+      "format": "PNG",
+      "fileSizeBytes": 324942,
+      "sourceArtwork": "release/promotional/icons/icon-source.svg",
+      "validationStatus": "generated_locally_pending_portal_spec_verification"
+    },
+    {
+      "filename": "release/promotional/icons/icon-1024x1024.png",
+      "assetType": "icon",
+      "aspectRatio": "1:1",
+      "requiredDimensionsNote": "Confirm exact pixel slots inside authenticated YouTube Playables Developer Portal Details step",
+      "actualDimensions": "1024x1024",
+      "format": "PNG",
+      "fileSizeBytes": 1146761,
+      "sourceArtwork": "release/promotional/icons/icon-source.svg",
+      "validationStatus": "generated_locally_pending_portal_spec_verification"
+    },
+    {
+      "filename": "release/promotional/thumbnails/thumbnail-16x9-1280x720.png",
+      "assetType": "thumbnail_landscape",
+      "aspectRatio": "16:9",
+      "requiredDimensionsNote": "Confirm exact pixel slots inside authenticated YouTube Playables Developer Portal Details step",
+      "actualDimensions": "1280x720",
+      "format": "PNG",
+      "fileSizeBytes": 887307,
+      "sourceArtwork": "release/promotional/thumbnails/thumbnail-16x9.svg",
+      "validationStatus": "generated_locally_pending_portal_spec_verification"
+    },
+    {
+      "filename": "release/promotional/thumbnails/thumbnail-1x1-1024x1024.png",
+      "assetType": "thumbnail_square",
+      "aspectRatio": "1:1",
+      "requiredDimensionsNote": "Confirm exact pixel slots inside authenticated YouTube Playables Developer Portal Details step",
+      "actualDimensions": "1024x1024",
+      "format": "PNG",
+      "fileSizeBytes": 1098186,
+      "sourceArtwork": "release/promotional/thumbnails/thumbnail-1x1.svg",
+      "validationStatus": "generated_locally_pending_portal_spec_verification"
+    },
+    {
+      "filename": "release/promotional/thumbnails/thumbnail-3x4-900x1200.png",
+      "assetType": "thumbnail_portrait",
+      "aspectRatio": "3:4",
+      "requiredDimensionsNote": "Confirm exact pixel slots inside authenticated YouTube Playables Developer Portal Details step",
+      "actualDimensions": "900x1200",
+      "format": "PNG",
+      "fileSizeBytes": 1069457,
+      "sourceArtwork": "release/promotional/thumbnails/thumbnail-3x4.svg",
+      "validationStatus": "generated_locally_pending_portal_spec_verification"
+    },
+    {
+      "filename": "release/promotional/screenshots/01-home-landscape-1280x720.png",
+      "assetType": "production_screenshot",
+      "aspectRatio": "16:9",
+      "requiredDimensionsNote": "Captured directly from served production dist/ build",
+      "actualDimensions": "1280x720",
+      "format": "PNG",
+      "fileSizeBytes": 191233,
+      "sourceArtwork": "dist/ production build",
+      "validationStatus": "captured_from_production_build"
+    },
+    {
+      "filename": "release/promotional/screenshots/02-home-returning-1280x720.png",
+      "assetType": "production_screenshot",
+      "aspectRatio": "16:9",
+      "requiredDimensionsNote": "Captured directly from served production dist/ build",
+      "actualDimensions": "1280x720",
+      "format": "PNG",
+      "fileSizeBytes": 193635,
+      "sourceArtwork": "dist/ production build",
+      "validationStatus": "captured_from_production_build"
+    },
+    {
+      "filename": "release/promotional/screenshots/03-levels-landscape-1280x720.png",
+      "assetType": "production_screenshot",
+      "aspectRatio": "16:9",
+      "requiredDimensionsNote": "Captured directly from served production dist/ build",
+      "actualDimensions": "1280x720",
+      "format": "PNG",
+      "fileSizeBytes": 101482,
+      "sourceArtwork": "dist/ production build",
+      "validationStatus": "captured_from_production_build"
+    },
+    {
+      "filename": "release/promotional/screenshots/04-gameplay-campaign-1280x720.png",
+      "assetType": "production_screenshot",
+      "aspectRatio": "16:9",
+      "requiredDimensionsNote": "Captured directly from served production dist/ build",
+      "actualDimensions": "1280x720",
+      "format": "PNG",
+      "fileSizeBytes": 125851,
+      "sourceArtwork": "dist/ production build",
+      "validationStatus": "captured_from_production_build"
+    },
+    {
+      "filename": "release/promotional/screenshots/05-gameplay-expert-1280x720.png",
+      "assetType": "production_screenshot",
+      "aspectRatio": "16:9",
+      "requiredDimensionsNote": "Captured directly from served production dist/ build",
+      "actualDimensions": "1280x720",
+      "format": "PNG",
+      "fileSizeBytes": 178003,
+      "sourceArtwork": "dist/ production build",
+      "validationStatus": "captured_from_production_build"
+    },
+    {
+      "filename": "release/promotional/screenshots/06-gameplay-portrait-390x844.png",
+      "assetType": "production_screenshot",
+      "aspectRatio": "portrait",
+      "requiredDimensionsNote": "Captured directly from served production dist/ build",
+      "actualDimensions": "390x844",
+      "format": "PNG",
+      "fileSizeBytes": 109129,
+      "sourceArtwork": "dist/ production build",
+      "validationStatus": "captured_from_production_build"
+    }
+  ]
+}

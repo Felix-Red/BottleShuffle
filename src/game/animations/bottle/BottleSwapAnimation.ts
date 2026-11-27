@@ -20,6 +20,7 @@ export interface BottleSwapAnimationParams {
   readonly bottlesLayer: Phaser.GameObjects.Container;
   readonly policy: AnimationPolicy;
   readonly bounds?: SafeTrajectoryBounds;
+  readonly onLanding?: () => void;
   readonly onComplete: () => void;
 }
 
@@ -33,8 +34,18 @@ export interface BottleSwapAnimationParams {
  * Returns a cancellation function that stops all tweens/trails and resets both sprites cleanly.
  */
 export function playBottleSwapAnimation(params: BottleSwapAnimationParams): () => void {
-  const { scene, spriteA, spriteB, fromA, fromB, bottlesLayer, policy, bounds, onComplete } =
-    params;
+  const {
+    scene,
+    spriteA,
+    spriteB,
+    fromA,
+    fromB,
+    bottlesLayer,
+    policy,
+    bounds,
+    onLanding,
+    onComplete,
+  } = params;
 
   const dimsA = spriteA.getBottleDimensions();
   const dimsB = spriteB.getBottleDimensions();
@@ -44,6 +55,15 @@ export function playBottleSwapAnimation(params: BottleSwapAnimationParams): () =
   let activeTweens: Phaser.Tweens.Tween[] = [];
   let trails: BottleMotionTrail[] = [];
   let finished = false;
+  let landingNotified = false;
+
+  const notifyLandingOnce = (): void => {
+    if (finished || landingNotified) {
+      return;
+    }
+    landingNotified = true;
+    onLanding?.();
+  };
 
   const stopAll = (): void => {
     for (const tween of activeTweens) {
@@ -93,6 +113,7 @@ export function playBottleSwapAnimation(params: BottleSwapAnimationParams): () =
   // Reduced-motion path: short direct glide with zero lift, tilt, squash, or trails
   if (policy.reducedMotion || !policy.allowCurvedSwap) {
     if (policy.swapMovementMs <= 0) {
+      notifyLandingOnce();
       finishOnce();
       return cancel;
     }
@@ -111,7 +132,10 @@ export function playBottleSwapAnimation(params: BottleSwapAnimationParams): () =
           spriteA.setPosition(lerp(fromA.x, fromB.x, proxy.t), lerp(fromA.y, fromB.y, proxy.t));
           spriteB.setPosition(lerp(fromB.x, fromA.x, proxy.t), lerp(fromB.y, fromA.y, proxy.t));
         },
-        onComplete: finishOnce,
+        onComplete: () => {
+          notifyLandingOnce();
+          finishOnce();
+        },
       }),
     );
     return cancel;
@@ -173,6 +197,8 @@ export function playBottleSwapAnimation(params: BottleSwapAnimationParams): () =
       shadowOffsetY: 0,
       shadowElevation: 0,
     });
+
+    notifyLandingOnce();
 
     if (!policy.allowSquashStretch || policy.bottleLandingMs <= 0) {
       finishOnce();

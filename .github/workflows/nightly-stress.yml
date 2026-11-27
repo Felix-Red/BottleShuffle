@@ -1,0 +1,32 @@
+name: Bottle Shuffle Scheduled Stress & Stability
+
+on:
+  schedule:
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stress-and-soak:
+    name: 12,000-Puzzle Stress & Long-Session Stability
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run 12,000-puzzle deterministic stress test
+        run: npm run test:stress
+
+      - name: Run 120-cycle long-session stability test
+        run: npx vitest run tests/performance/LongSessionAndAdversarialStability.test.ts

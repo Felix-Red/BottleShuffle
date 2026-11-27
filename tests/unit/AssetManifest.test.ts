@@ -29,7 +29,7 @@ describe('AssetManifest', () => {
     for (const bottle of BOTTLE_CATALOG) {
       const manifestEntry = manifestByKey.get(bottle.textureKey);
       expect(manifestEntry).toBeDefined();
-      expect(manifestEntry?.path).toBe(`./assets/bottles/${bottle.id}.png`);
+      expect(manifestEntry?.path).toBe(`./assets/bottles/${bottle.id}.webp`);
     }
   });
 });

@@ -6,7 +6,12 @@ export type ActionRejectionReason =
   | 'PUZZLE_ALREADY_COMPLETED'
   | 'INVALID_STATE_TRANSITION';
 
-export type GameErrorCode = 'INVALID_PUZZLE' | 'INVALID_SWAP_INDEX' | 'INVALID_SEQUENCE';
+export type GameErrorCode =
+  | 'INVALID_PUZZLE'
+  | 'INVALID_SWAP_INDEX'
+  | 'INVALID_SEQUENCE'
+  | 'INVALID_SCORING_INPUT'
+  | 'INVALID_SETTINGS_INPUT';
 
 export class GameError extends Error {
   public readonly code: GameErrorCode;

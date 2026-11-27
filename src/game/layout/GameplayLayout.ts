@@ -1,8 +1,16 @@
+import { getResponsiveTokens } from '../../design-system/layout/ResponsiveTokens';
 import { Dimens } from '../../design-system/tokens/Dimens';
 import {
   calculateBottleRackLayout,
   type BottleRackLayoutResult,
 } from '../components/environment/bottleLayout';
+import type { LayoutProfile } from './LayoutProfile';
+import { isCompactProfile, resolveLayoutProfile } from './LayoutProfileResolver';
+import {
+  createViewportMetrics,
+  type ContentBounds,
+  type PartialSafeAreaInsets,
+} from './ViewportMetrics';
 
 export interface GameplayLayoutInput {
   readonly width: number;
@@ -10,12 +18,15 @@ export interface GameplayLayoutInput {
   readonly bottleCount: number;
   readonly safeAreaTop?: number;
   readonly safeAreaBottom?: number;
+  readonly safeArea?: PartialSafeAreaInsets;
 }
 
 export interface GameplayHeaderLayout {
   readonly width: number;
   readonly height: number;
   readonly y: number;
+  readonly leftInset?: number;
+  readonly rightInset?: number;
 }
 
 export interface GameplayHudLayout {
@@ -64,15 +75,15 @@ export interface GameplayLayout {
   readonly width: number;
   readonly height: number;
   readonly orientation: 'landscape' | 'portrait';
+  readonly profile: LayoutProfile;
   readonly isCompact: boolean;
+  readonly contentBounds: ContentBounds;
   readonly header: GameplayHeaderLayout;
   readonly hud: GameplayHudLayout;
   readonly board: GameplayBoardLayout;
   readonly instructions: GameplayInstructionsLayout;
   readonly modalBounds: { readonly width: number; readonly height: number };
 }
-
-const MIN_VIEWPORT = 280;
 
 function estimateHiddenCompartmentHeight(
   rows: 1 | 2,
@@ -91,31 +102,62 @@ function estimateHiddenCompartmentHeight(
 }
 
 export function calculateGameplayLayout(input: GameplayLayoutInput): GameplayLayout {
-  const width = Math.max(MIN_VIEWPORT, Number.isFinite(input.width) ? input.width : 1280);
-  const height = Math.max(MIN_VIEWPORT, Number.isFinite(input.height) ? input.height : 720);
-  const safeTop = Math.max(0, input.safeAreaTop ?? 0);
-  const safeBottom = Math.max(0, input.safeAreaBottom ?? 0);
+  const mergedSafeArea: PartialSafeAreaInsets = {
+    top: input.safeArea?.top ?? input.safeAreaTop ?? 0,
+    right: input.safeArea?.right ?? 0,
+    bottom: input.safeArea?.bottom ?? input.safeAreaBottom ?? 0,
+    left: input.safeArea?.left ?? 0,
+  };
 
-  const orientation: 'landscape' | 'portrait' = width >= height ? 'landscape' : 'portrait';
-  const isCompact = width < 640 || height < 480;
-  const isShortLandscape = orientation === 'landscape' && height < 460;
-  const isShortPortrait = orientation === 'portrait' && height < 700;
-  const centerX = Math.round(width / 2);
-  const padX = isCompact ? Dimens.ScreenPaddingCompact : Dimens.ScreenPadding;
-  const contentWidth = Math.max(240, width - padX * 2);
+  const viewport = createViewportMetrics({
+    width: input.width,
+    height: input.height,
+    safeArea: mergedSafeArea,
+  });
+  const profile = resolveLayoutProfile(viewport);
+  const tokens = getResponsiveTokens(profile);
 
-  const headerHeight = isCompact ? Dimens.HeaderHeightCompact : Dimens.HeaderHeight;
+  const { width, height, orientation, safeArea, contentBounds } = viewport;
+  const effectiveW = contentBounds.width;
+  const effectiveH = contentBounds.height;
+
+  const isCompact = isCompactProfile(profile) || effectiveW < 640 || effectiveH < 480;
+  const isShortLandscape = orientation === 'landscape' && effectiveH < 460;
+  const isUltraShortLandscape = orientation === 'landscape' && effectiveH < 370;
+  const isShortPortrait = orientation === 'portrait' && effectiveH < 700;
+  const isUltraShortPortrait = orientation === 'portrait' && effectiveH < 560;
+
+  const centerX = contentBounds.centerX;
+  const padX = isCompact ? Dimens.ScreenPaddingCompact : tokens.screenPaddingX;
+  const contentWidth = Math.max(220, Math.min(tokens.maxContentWidth, effectiveW - padX * 2));
+
+  const headerHeight = isUltraShortLandscape
+    ? 44
+    : isShortLandscape
+      ? 48
+      : isCompact
+        ? Dimens.HeaderHeightCompact
+        : tokens.headerHeight;
   const header: GameplayHeaderLayout = {
     width,
     height: headerHeight,
-    y: safeTop,
+    y: safeArea.top,
+    leftInset: safeArea.left,
+    rightInset: safeArea.right,
   };
 
-  const instructionsHeight = isShortLandscape || isShortPortrait ? 22 : isCompact ? 34 : 42;
+  const instructionsHeight =
+    isUltraShortLandscape || isUltraShortPortrait
+      ? 18
+      : isShortLandscape || isShortPortrait
+        ? 22
+        : isCompact
+          ? 34
+          : 42;
   const instructionsBottomMargin =
     isShortLandscape || isShortPortrait ? Dimens.Space4 : Dimens.Space6;
   const instructionsY = Math.round(
-    height - safeBottom - instructionsHeight / 2 - instructionsBottomMargin,
+    contentBounds.bottom - instructionsHeight / 2 - instructionsBottomMargin,
   );
   const instructions: GameplayInstructionsLayout = {
     x: centerX,
@@ -125,29 +167,39 @@ export function calculateGameplayLayout(input: GameplayLayoutInput): GameplayLay
   };
 
   if (orientation === 'landscape') {
-    const hudScale = isShortLandscape ? 0.8 : 1;
+    const hudScale = isUltraShortLandscape ? 0.68 : isShortLandscape ? 0.78 : 1;
     const hudTopY =
-      safeTop +
+      safeArea.top +
       headerHeight +
-      (isShortLandscape ? Dimens.Space4 : isCompact ? Dimens.Space8 : Dimens.Space16);
-    const hudHeight = isShortLandscape ? 72 : isCompact ? 96 : 112;
+      (isUltraShortLandscape
+        ? Dimens.Space2
+        : isShortLandscape
+          ? Dimens.Space4
+          : isCompact
+            ? Dimens.Space8
+            : Dimens.Space16);
+    const hudHeight = isUltraShortLandscape ? 54 : isShortLandscape ? 68 : isCompact ? 94 : 110;
     const hudCenterY = Math.round(hudTopY + hudHeight / 2);
 
+    const maxClusterW = Math.min(1080, contentWidth);
+    const clusterGap = isUltraShortLandscape
+      ? Dimens.Space8
+      : isShortLandscape
+        ? Dimens.Space12
+        : Dimens.Space20;
+
+    // Guarantee MatchCounter + 2 side stat cards never exceed maxClusterW horizontally
     const matchCounterWidth = Math.min(
-      isCompact ? 300 : 380,
-      Math.max(220, Math.round(contentWidth * 0.4)),
+      isCompact ? 290 : 380,
+      Math.max(196, Math.round((maxClusterW * 0.42) / hudScale)),
     );
-    const sideSpace = Math.max(
-      120,
-      (Math.min(1080, contentWidth) - matchCounterWidth * hudScale) / 2 - Dimens.Space20,
-    );
+    const scaledMatchW = matchCounterWidth * hudScale;
+    const availablePerSide = Math.max(88, (maxClusterW - scaledMatchW) / 2 - clusterGap);
     const statWidth = Math.min(
       isCompact ? 156 : 186,
-      Math.max(118, Math.floor(sideSpace / hudScale)),
+      Math.max(106, Math.floor(availablePerSide / hudScale)),
     );
-    const statHeight = isCompact ? 68 : 78;
-
-    const clusterGap = isShortLandscape ? Dimens.Space12 : Dimens.Space20;
+    const statHeight = isUltraShortLandscape ? 60 : isCompact ? 68 : 78;
     const halfCluster = (matchCounterWidth / 2 + statWidth / 2) * hudScale + clusterGap;
 
     const hud: GameplayHudLayout = {
@@ -173,34 +225,47 @@ export function calculateGameplayLayout(input: GameplayLayoutInput): GameplayLay
     const boardTopY =
       hudTopY +
       hudHeight +
-      (isShortLandscape ? Dimens.Space8 : isCompact ? Dimens.Space12 : Dimens.Space20);
+      (isUltraShortLandscape
+        ? Dimens.Space4
+        : isShortLandscape
+          ? Dimens.Space8
+          : isCompact
+            ? Dimens.Space12
+            : Dimens.Space20);
     const boardBottomY =
-      instructionsY - instructionsHeight / 2 - (isShortLandscape ? Dimens.Space6 : Dimens.Space10);
-    const totalBoardHeight = Math.max(140, boardBottomY - boardTopY);
+      instructionsY - instructionsHeight / 2 - (isShortLandscape ? Dimens.Space4 : Dimens.Space10);
+    const totalBoardHeight = Math.max(116, boardBottomY - boardTopY);
     const rackAvailableWidth = Math.min(1140, contentWidth);
 
     const showHiddenLabel = !isShortLandscape;
-    const estimatedHiddenH = estimateHiddenCompartmentHeight(
+    const rackGap = isUltraShortLandscape
+      ? Dimens.Space8
+      : isShortLandscape
+        ? Dimens.Space12
+        : Dimens.Space20;
+    const rackVerticalSpacing = isShortLandscape ? Dimens.Space12 : tokens.rackVerticalSpacing;
+
+    const targetHiddenScale = isUltraShortLandscape ? 0.56 : isShortLandscape ? 0.72 : 1;
+    const rawSingleRowHiddenH = estimateHiddenCompartmentHeight(
       1,
       rackAvailableWidth,
       input.bottleCount,
       showHiddenLabel,
     );
-    const rackGap = isShortLandscape ? Dimens.Space16 : Dimens.Space20;
-    const rackVerticalSpacing = Dimens.Space24;
-    const rackAvailableHeight = Math.max(
-      115,
-      totalBoardHeight - estimatedHiddenH * (isShortLandscape ? 0.78 : 1) - rackGap,
+    const reservedHiddenH = Math.round(
+      Math.min(rawSingleRowHiddenH * targetHiddenScale, totalBoardHeight * 0.34),
     );
+    const rackAvailableHeight = Math.max(82, totalBoardHeight - reservedHiddenH - rackGap);
 
     const rackLayout = calculateBottleRackLayout({
       availableWidth: rackAvailableWidth,
       availableHeight: rackAvailableHeight,
       bottleCount: input.bottleCount,
-      aspectRatio: width / height,
+      aspectRatio: effectiveW / effectiveH,
+      horizontalSpacing: tokens.bottleSlotSpacing,
       verticalSpacing: rackVerticalSpacing,
-      maxBottleWidth: isShortLandscape ? 54 : isCompact ? 74 : 98,
-      maxBottleHeight: isShortLandscape ? 108 : isCompact ? 148 : 196,
+      maxBottleWidth: isUltraShortLandscape ? 48 : isShortLandscape ? 58 : isCompact ? 74 : 98,
+      maxBottleHeight: isUltraShortLandscape ? 96 : isShortLandscape ? 116 : isCompact ? 148 : 196,
     });
 
     const hiddenRows: 1 | 2 = rackLayout.rows === 2 ? 2 : 1;
@@ -211,10 +276,9 @@ export function calculateGameplayLayout(input: GameplayLayoutInput): GameplayLay
       rackLayout.bottleCount,
       showHiddenLabel,
     );
-    const maxHiddenHeight = Math.max(40, totalBoardHeight - rackLayout.rackHeight - rackGap);
-    const targetMaxScale = isShortLandscape ? 0.78 : 1;
-    const hiddenScale = Math.min(targetMaxScale, maxHiddenHeight / rawHiddenHeight);
-    const hiddenRackHeight = Math.round(rawHiddenHeight * hiddenScale);
+    const maxHiddenHeight = Math.max(32, totalBoardHeight - rackLayout.rackHeight - rackGap);
+    const hiddenScale = Math.min(targetHiddenScale, maxHiddenHeight / rawHiddenHeight);
+    const hiddenRackHeight = Math.min(maxHiddenHeight, Math.round(rawHiddenHeight * hiddenScale));
 
     const combinedH = rackLayout.rackHeight + rackGap + hiddenRackHeight;
     const blockStartY = boardTopY + Math.max(0, (totalBoardHeight - combinedH) / 2);
@@ -228,7 +292,9 @@ export function calculateGameplayLayout(input: GameplayLayoutInput): GameplayLay
       width,
       height,
       orientation,
+      profile,
       isCompact,
+      contentBounds,
       header,
       hud,
       board: {
@@ -253,20 +319,26 @@ export function calculateGameplayLayout(input: GameplayLayoutInput): GameplayLay
   }
 
   // Portrait layout: Header -> MatchCounter -> Move + Timer row -> BottleRack -> HiddenCompartment -> Instructions
-  const hudScale = isShortPortrait ? 0.82 : 1;
-  const hudTopY = safeTop + headerHeight + (isShortPortrait ? Dimens.Space6 : Dimens.Space12);
-  const matchCounterWidth = Math.min(440, contentWidth);
-  const matchCounterY = Math.round(hudTopY + 46 * hudScale);
-  const feedbackY = Math.round(matchCounterY + 54 * hudScale);
+  const hudScale = isUltraShortPortrait ? 0.74 : isShortPortrait ? 0.82 : 1;
+  const hudTopY =
+    safeArea.top +
+    headerHeight +
+    (isUltraShortPortrait ? Dimens.Space4 : isShortPortrait ? Dimens.Space6 : Dimens.Space12);
+  const matchCounterWidth = Math.min(440, Math.round(contentWidth / hudScale));
+  const matchCounterY = Math.round(hudTopY + 42 * hudScale);
+  const feedbackY = Math.round(matchCounterY + (isUltraShortPortrait ? 44 : 52) * hudScale);
 
-  const statHeight = isCompact ? 62 : 70;
+  const statHeight = isUltraShortPortrait ? 52 : isCompact ? 60 : 70;
   const statGap = isShortPortrait ? Dimens.Space8 : Dimens.Space12;
+  const maxScaledRowW = Math.min(440, contentWidth);
   const statWidth = Math.min(
     206,
-    Math.max(124, Math.floor((matchCounterWidth - statGap) / (2 * hudScale))),
+    Math.max(114, Math.floor((maxScaledRowW - statGap) / (2 * hudScale))),
   );
   const statsRowY = Math.round(
-    feedbackY + (isShortPortrait ? 12 : 18) + (statHeight * hudScale) / 2,
+    feedbackY +
+      (isUltraShortPortrait ? 8 : isShortPortrait ? 12 : 18) +
+      (statHeight * hudScale) / 2,
   );
   const hudBottomY = Math.round(statsRowY + (statHeight * hudScale) / 2);
 
@@ -288,35 +360,50 @@ export function calculateGameplayLayout(input: GameplayLayoutInput): GameplayLay
     feedbackY,
   };
 
-  const boardTopY = hudBottomY + (isShortPortrait ? Dimens.Space8 : Dimens.Space16);
+  const boardTopY =
+    hudBottomY +
+    (isUltraShortPortrait ? Dimens.Space6 : isShortPortrait ? Dimens.Space8 : Dimens.Space16);
   const boardBottomY =
-    instructionsY - instructionsHeight / 2 - (isShortPortrait ? Dimens.Space6 : Dimens.Space8);
-  const totalBoardHeight = Math.max(180, boardBottomY - boardTopY);
+    instructionsY -
+    instructionsHeight / 2 -
+    (isUltraShortPortrait ? Dimens.Space4 : isShortPortrait ? Dimens.Space6 : Dimens.Space8);
+  const totalBoardHeight = Math.max(136, boardBottomY - boardTopY);
   const rackAvailableWidth = Math.min(540, contentWidth);
 
   const showHiddenLabel = !isShortPortrait;
   const tentativeRows: 1 | 2 = input.bottleCount >= 6 ? 2 : 1;
-  const estimatedHiddenH = estimateHiddenCompartmentHeight(
+  const rawTentativeHiddenH = estimateHiddenCompartmentHeight(
     tentativeRows,
     rackAvailableWidth,
     input.bottleCount,
     showHiddenLabel,
   );
-  const rackGap = isShortPortrait ? Dimens.Space12 : Dimens.Space16;
-  const rackVerticalSpacing = isShortPortrait ? Dimens.Space16 : Dimens.Space32;
-  const rackAvailableHeight = Math.max(
-    130,
-    totalBoardHeight - estimatedHiddenH * (isShortPortrait ? 0.85 : 1) - rackGap,
+  const targetHiddenScale = isUltraShortPortrait ? 0.62 : isShortPortrait ? 0.82 : 1;
+  const rackGap = isUltraShortPortrait
+    ? Dimens.Space8
+    : isShortPortrait
+      ? Dimens.Space12
+      : Dimens.Space16;
+  const rackVerticalSpacing = isUltraShortPortrait
+    ? Dimens.Space10
+    : isShortPortrait
+      ? Dimens.Space16
+      : tokens.rackVerticalSpacing;
+
+  const reservedHiddenH = Math.round(
+    Math.min(rawTentativeHiddenH * targetHiddenScale, totalBoardHeight * 0.34),
   );
+  const rackAvailableHeight = Math.max(88, totalBoardHeight - reservedHiddenH - rackGap);
 
   const rackLayout = calculateBottleRackLayout({
     availableWidth: rackAvailableWidth,
     availableHeight: rackAvailableHeight,
     bottleCount: input.bottleCount,
-    aspectRatio: width / height,
+    aspectRatio: effectiveW / effectiveH,
+    horizontalSpacing: tokens.bottleSlotSpacing,
     verticalSpacing: rackVerticalSpacing,
-    maxBottleWidth: isShortPortrait ? 50 : 84,
-    maxBottleHeight: isShortPortrait ? 100 : 168,
+    maxBottleWidth: isUltraShortPortrait ? 44 : isShortPortrait ? 52 : 84,
+    maxBottleHeight: isUltraShortPortrait ? 88 : isShortPortrait ? 104 : 168,
   });
 
   const hiddenRows: 1 | 2 = rackLayout.rows === 2 ? 2 : 1;
@@ -327,9 +414,9 @@ export function calculateGameplayLayout(input: GameplayLayoutInput): GameplayLay
     rackLayout.bottleCount,
     showHiddenLabel,
   );
-  const maxHiddenHeight = Math.max(48, totalBoardHeight - rackLayout.rackHeight - rackGap);
-  const hiddenScale = Math.min(1, maxHiddenHeight / rawHiddenHeight);
-  const hiddenRackHeight = Math.round(rawHiddenHeight * hiddenScale);
+  const maxHiddenHeight = Math.max(36, totalBoardHeight - rackLayout.rackHeight - rackGap);
+  const hiddenScale = Math.min(targetHiddenScale, maxHiddenHeight / rawHiddenHeight);
+  const hiddenRackHeight = Math.min(maxHiddenHeight, Math.round(rawHiddenHeight * hiddenScale));
 
   const combinedH = rackLayout.rackHeight + rackGap + hiddenRackHeight;
   const blockStartY = boardTopY + Math.max(0, (totalBoardHeight - combinedH) / 2);
@@ -343,7 +430,9 @@ export function calculateGameplayLayout(input: GameplayLayoutInput): GameplayLay
     width,
     height,
     orientation,
+    profile,
     isCompact,
+    contentBounds,
     header,
     hud,
     board: {

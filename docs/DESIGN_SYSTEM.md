@@ -117,14 +117,15 @@ Reference scale at `1280 × 720` (`src/design-system/tokens/Typography.ts`):
 
 All components are exported from `src/design-system/index.ts`:
 
-| Category       | Components                                                                                                     |
-| -------------- | -------------------------------------------------------------------------------------------------------------- |
-| **Buttons**    | `PrimaryButton`, `SecondaryButton`, `OutlineButton`, `TextButton`, `IconButton` (shared logic in `BaseButton`) |
-| **Cards**      | `GameCard`, `LevelCard`, `StatCard`                                                                            |
-| **Indicators** | `ProgressBar`, `MatchCounter`, `StarRating`, `LoadingIndicator`                                                |
-| **Controls**   | `ToggleSwitch`                                                                                                 |
-| **Overlays**   | `Modal`, `ConfirmDialog`, `Toast`                                                                              |
-| **Layout**     | `GameHeader`, `GamePanel`                                                                                      |
+| Category       | Components                                                                                                                                                                                                                       |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Buttons**    | `PrimaryButton`, `SecondaryButton`, `OutlineButton`, `TextButton`, `IconButton` (shared logic in `BaseButton`)                                                                                                                   |
+| **Cards**      | `GameCard`, `LevelCard` (extended in Task 10 with visible locked numbers, `onLockedSelect`, recommended play icon & subtle pulse, orthogonal `selected`/`focused` outlines, `setCardSize`, and optional `showStars`), `StatCard` |
+| **Icons**      | `IconGraphic` (`back`, `next`, `close`, `play`, `pause`, `restart`, `settings`, `sound`, `mute`, `lock`, `check`, `star`, `trophy`, `clock`, `moves`, `info`, `warning`, `error`, `plus`, `minus`, `sparkles`, `grid`)           |
+| **Indicators** | `ProgressBar`, `MatchCounter`, `StarRating`, `LoadingIndicator`                                                                                                                                                                  |
+| **Controls**   | `ToggleSwitch`                                                                                                                                                                                                                   |
+| **Overlays**   | `Modal`, `ConfirmDialog`, `Toast`                                                                                                                                                                                                |
+| **Layout**     | `GameHeader`, `GamePanel`                                                                                                                                                                                                        |
 
 ### Example: Buttons
 
@@ -208,3 +209,21 @@ dialog.open();
 - **Non-colour differentiation:** Bottle tokens include distinct `symbol` and `pattern` identifiers for future colour-blind-friendly rendering, and `MatchCounter` displays both numeric count (`3/10`) and segmented fill.
 - **Reduced motion:** Supported across buttons, indicators, switches, modals, and toasts via `GameTheme.reducedMotion`.
 - **Known canvas limitations:** Because Phaser renders to a single `<canvas>` element, native browser screen readers and DOM Tab focus traversal cannot inspect individual canvas controls automatically. Focus ring styling (`setFocused(true)`) is implemented on buttons so keyboard navigation and optional DOM accessibility overlays can be wired in a future pass.
+
+## Task 12 Additions — `StarRating` & `LevelCard` Star Display
+
+- `StarRating` renders filled stars with a subtle shadow and bright rim, and unearned stars with a crisp 5-point hollow outline so star ratings remain legible without relying solely on colour.
+- `StarRating.playSequentialReveal()` supports reduced-motion-aware sequential Victory reveals with per-star callback hooks for sparkle bursts.
+- `LevelCard.setShowStars()` toggles star display cleanly for completed levels with recorded ratings while keeping locked, unlocked, and legacy records uncluttered.
+
+## Task 13 Additions — Destructive Confirmations & Settings Controls
+
+- `Modal` and `ConfirmDialog` now support optional `destructive?: boolean` (using `Colors.Semantic.ErrorDark` / `Colors.Semantic.Error` strictly for final destructive confirmation buttons) and explicit `depth?: number` for clean overlay stacking (`PauseOverlay: 940`, `SettingsOverlay: 980`, `ConfirmDialog: 1020`).
+- `SettingsToggleRow` pairs `ToggleSwitch` with explicit `ON`/`OFF` text labels and disjoint label/switch hit zones so settings remain accessible without relying on colour alone.
+
+---
+
+## Responsive Design Tokens and Modal Constraints (Task 16)
+
+- Added profile-indexed responsive design tokens in `src/design-system/layout/ResponsiveTokens.ts` (`getResponsiveTokens(profile)`) and shared safe-area-aware modal bounds in `src/design-system/layout/LayoutConstraints.ts` (`computeModalBounds(viewport)`).
+- Updated `Modal.resize(width, height, safeArea?)` to clamp dialog dimensions inside effective content bounds across all 5 layout profiles while keeping touch targets `>= 44px`. See [RESPONSIVE_LAYOUT.md](./RESPONSIVE_LAYOUT.md).

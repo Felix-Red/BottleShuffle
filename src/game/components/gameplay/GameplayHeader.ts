@@ -91,9 +91,13 @@ export class GameplayHeader extends Phaser.GameObjects.Container {
   public applyLayout(layout: GameplayHeaderLayout): this {
     this.setPosition(0, layout.y);
 
-    const compact = layout.width < 600;
+    const leftInset = layout.leftInset ?? 0;
+    const rightInset = layout.rightInset ?? 0;
+    const effectiveW = Math.max(240, layout.width - leftInset - rightInset);
+    const compact = effectiveW < 600 || layout.height <= 50;
     const padX = compact ? Dimens.ScreenPaddingCompact : Dimens.ScreenPadding;
     const centerY = layout.height / 2;
+    const centerX = leftInset + effectiveW / 2;
 
     this.backgroundGraphics.clear();
     this.backgroundGraphics.fillStyle(hexToNumber(Colors.Surface.Surface), 0.9);
@@ -106,7 +110,7 @@ export class GameplayHeader extends Phaser.GameObjects.Container {
 
     const maxTextW = Math.max(
       120,
-      layout.width - (padX + Dimens.MinTouchTarget + Dimens.Space16) * 2,
+      effectiveW - (padX + Dimens.MinTouchTarget + Dimens.Space16) * 2,
     );
     this.titleText.setStyle(
       createTextStyle(compact ? Typography.TitleMedium : Typography.TitleLarge, {
@@ -117,14 +121,19 @@ export class GameplayHeader extends Phaser.GameObjects.Container {
     );
 
     if (this.subtitleText !== undefined) {
-      this.titleText.setPosition(layout.width / 2, centerY - 10);
-      this.subtitleText.setPosition(layout.width / 2, centerY + 13);
+      const titleOffset = layout.height <= 46 ? 8 : 10;
+      const subtitleOffset = layout.height <= 46 ? 11 : 13;
+      this.titleText.setPosition(centerX, centerY - titleOffset);
+      this.subtitleText.setPosition(centerX, centerY + subtitleOffset);
     } else {
-      this.titleText.setPosition(layout.width / 2, centerY);
+      this.titleText.setPosition(centerX, centerY);
     }
 
-    this.pauseButton.setPosition(padX + Dimens.MinTouchTarget / 2, centerY);
-    this.restartButton.setPosition(layout.width - padX - Dimens.MinTouchTarget / 2, centerY);
+    this.pauseButton.setPosition(leftInset + padX + Dimens.MinTouchTarget / 2, centerY);
+    this.restartButton.setPosition(
+      layout.width - rightInset - padX - Dimens.MinTouchTarget / 2,
+      centerY,
+    );
     this.setSize(layout.width, layout.height);
     return this;
   }

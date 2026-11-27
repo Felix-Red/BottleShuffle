@@ -12,10 +12,15 @@ This document describes the end-to-end architecture, scene initialisation flow, 
 
 ## 2. Scene Initialisation Flow
 
-1. `HomeScene` (or dev-only `/?scene=game&difficulty=...&seed=...`) starts `SCENE_KEYS.GAME` with typed `GameplaySceneData`.
-2. `GameplayController` resolves the launch configuration (`resolveGameplayLaunch`), generates a puzzle via `generatePuzzle` (using an injected boundary `SeedProvider` if no explicit seed was provided), and creates an authoritative `GameEngine`.
-3. If configuration validation or generation fails, `GameScene` displays a clean error recovery `Modal` with a **Return to Home** action without exposing stack traces.
-4. On success, `GameScene` computes the responsive `GameplayLayout`, constructs `GameBackground`, `GameplayHeader`, `GameplayHUD`, `GameplayBoard`, `GameplayInstructions`, and overlays (`pauseModal`, `restartDialog`, `completionModal`), binds resize/keyboard/platform lifecycle listeners, starts the 250ms timer poll, and calls `controller.start()`.
+1. `HomeScene` or `LevelSelectionScene` (or dev-only `/?scene=tutorial`, `/?scene=game&level=level-001`, `/?scene=game&difficulty=...&seed=...`) starts `SCENE_KEYS.GAME` with typed `GameplaySceneData` distinguishing `mode: 'campaign'`, `mode: 'practice'`, and `mode: 'tutorial'`.
+2. In **tutorial mode** (Task 11), `GameScene` delegates instructional progression and input filtering to `TutorialController` while reusing the exact same `GameEngine`, `GameplayHUD`, `GameplayBoard`, curved swap animations, `AnimationCoordinator`, and `VictoryCelebration`, flanked by `TutorialHeader`, `TutorialSpotlight`, `TutorialPointer`, `TutorialInstructionPanel`, and `TutorialCompletionOverlay`. See [docs/TUTORIAL.md](./TUTORIAL.md).
+3. In **campaign mode**, `GameplayController` calls `ProgressionController.beginCampaignAttempt(levelId)` to validate that the level is unlocked, issue a unique campaign `attemptId`, retrieve its `LevelDefinition`, and generate its deterministic puzzle on demand via `generateLevelPuzzle`. Locked or unknown levels show a player-friendly error recovery modal.
+4. In **practice mode**, `GameplayController` resolves the chosen difficulty (`resolveGameplayLaunch`) and generates a standalone puzzle via `generatePuzzle` without touching campaign progression.
+5. On success, `GameScene` computes the responsive `GameplayLayout`, constructs `GameBackground`, `GameplayHeader` (`Level N` + `Chapter · K Bottles` in campaign mode, `<Difficulty> Practice` in practice mode), `GameplayHUD`, `GameplayBoard`, `GameplayInstructions`, and overlays, binds resize/keyboard/platform lifecycle listeners, starts the 250ms timer poll, and calls `controller.start()`.
+6. On completion:
+   - **Campaign mode:** records completion idempotently through `ProgressionController.completeActiveAttempt(...)`, plays `VictoryCelebration`, and presents **Next: Level N+1** (omitted on final Level 50 with a **Campaign Complete!** banner), **Replay**, and **Return to Home** / **Back to Levels**.
+   - **Practice mode:** plays `VictoryCelebration` and presents **Play Again** and **Return to Home** without modifying campaign progression.
+   - **Tutorial mode:** marks tutorial completion in `TutorialPreferenceService`, presents `TutorialCompletionOverlay`, and launches the preserved campaign destination (or returns to the originating screen on manual replay) without altering campaign progression.
 
 ---
 
@@ -73,4 +78,15 @@ Calculated by pure Phaser-free `calculateGameplayLayout()` (`src/game/layout/Gam
 
 - Supports touch and mouse tap-to-select / tap-to-swap, tap-outside-rack to clear selection, and modal input blocking.
 - Supports keyboard navigation (`ArrowLeft` / `ArrowRight` to highlight logical bottle slots, `Enter` / `Space` to select/swap, `Escape` to clear selection or toggle pause/cancel dialogs) without calling `preventDefault()` on reserved host shortcuts.
-- **Known limitations:** Because Phaser renders onto a single `<canvas>`, native browser screen readers do not inspect individual bottle sprites automatically; drag-and-drop swapping, advanced curved swap animations, audio SFX, scoring/stars, level unlocking, and YouTube Playables SDK integration are deferred to later tasks.
+- **Known limitations:** Because Phaser renders onto a single `<canvas>`, native browser screen readers do not inspect individual bottle sprites automatically; drag-and-drop swapping, audio SFX (Task 14), persistent save storage (Task 15), and YouTube Playables SDK integration are deferred to later tasks. Task 12 replaced the temporary completion modal with the production `VictoryOverlay` (see [docs/VICTORY_SCREEN.md](./VICTORY_SCREEN.md)).
+
+## Task 13 Update — Production Pause Menu & Lifecycle Coordination
+
+Temporary pause and restart modals have been replaced by `PauseOverlay`, `RestartConfirmation`, `ExitConfirmation`, and the shared `SettingsOverlay`, all coordinated through `GameplayLifecycleCoordinator`. See [docs/GAMEPLAY_LIFECYCLE.md](./GAMEPLAY_LIFECYCLE.md) and [docs/SETTINGS.md](./SETTINGS.md).
+
+---
+
+## Cross-Device Gameplay Layouts & Safe Areas (Task 16)
+
+- `GameplayLayout` consumes `createViewportMetrics`, `resolveLayoutProfile`, and `getResponsiveTokens`, propagating 4-sided `SafeAreaInsets` to `GameplayHeader`, `GameplayHUD`, `GameplayBoard`, `GameplayInstructions`, and active overlays.
+- Ultra-compact landscape (`568×320`, `600×340`) uses compact header/HUD scaling and single-row bottle racks to maximize bottle legibility without vertical clipping. See [RESPONSIVE_LAYOUT.md](./RESPONSIVE_LAYOUT.md).

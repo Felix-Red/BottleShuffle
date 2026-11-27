@@ -1,0 +1,47 @@
+{
+  "schemaNote": "Internal submission metadata record for Bottle Shuffle. Confirm exact field limits inside the authenticated YouTube Playables Developer Portal Details step before submission.",
+  "releaseIdentifier": "bottle-shuffle-1.0.0-rc.1",
+  "applicationVersion": "1.0.0-rc.1",
+  "versions": {
+    "saveSchemaVersion": 1,
+    "puzzleGeneratorVersion": "1.0.0",
+    "scoringPolicyVersion": 1,
+    "campaignCatalogVersion": "1.0.0"
+  },
+  "gameTitle": "Bottle Shuffle",
+  "publisher": "CrowdArcade",
+  "publisherStatus": "provisional_pending_owner_confirmation",
+  "tagline": "Swap. Match. Master.",
+  "genre": "Casual Puzzle",
+  "gameplayFormat": "Single-player",
+  "shortDescription": "Swap colourful bottles, uncover the secret order and master 50 brain-teasing puzzles.",
+  "fullDescription": "Think you can uncover the secret bottle sequence?\n\nIn Bottle Shuffle, your challenge is to rearrange colourful bottles until they match a hidden order. Swap any two bottles and watch the match counter to discover how close you are to solving the puzzle.\n\nStart with simple three-bottle challenges and progress towards increasingly challenging ten-bottle puzzles. Complete 50 levels, earn stars, improve your personal bests and sharpen your puzzle-solving skills.\n\nFeatures:\n\n- 50 puzzles across six difficulty tiers.\n- Simple tap-to-swap controls.\n- Hidden sequences and aggregate match feedback.\n- Interactive tutorial.\n- Star ratings and efficiency-based scoring.\n- Personal best records.\n- Unlimited randomised practice.\n- Colourful bottle designs with distinctive symbols.\n- Landscape and portrait gameplay.\n\nSwap. Match. Master.",
+  "supportedLanguages": ["en"],
+  "inputMethods": ["touch", "mouse", "keyboard_gameplay"],
+  "orientationSupport": ["landscape", "portrait", "square", "responsive"],
+  "cloudSaveSupport": {
+    "enabled": true,
+    "provider": "ytgame.game.loadData / ytgame.game.saveData",
+    "maxObservedPayloadBytes": 8179
+  },
+  "advertisingConfiguration": {
+    "preRoll": "youtube_managed_automatic",
+    "interstitial": "enabled_between_completed_campaign_levels",
+    "rewarded": "disabled_in_initial_release_infrastructure_only",
+    "thirdPartyAdNetworks": false,
+    "inAppPurchases": false
+  },
+  "accessibilitySummary": [
+    "Colour-blind friendly bottle symbols paired with distinct colours",
+    "Numeric and directional match feedback (not colour alone)",
+    "OS and in-game Reduced Motion support",
+    "Audio and haptic feedback optional (100% playable muted)",
+    "Minimum 48px interactive touch targets"
+  ],
+  "contentSuitabilityNotes": {
+    "visualFraming": "Stylised abstract puzzle bottles with geometric symbols; zero alcohol-consumption, gambling, violence, or real-money reward mechanics.",
+    "ageRatingStatus": "not_assigned_complete_in_developer_portal"
+  },
+  "supportContact": "[OWNER_SUPPORT_EMAIL_REQUIRED]",
+  "privacyPolicyUrl": "[OWNER_PRIVACY_POLICY_URL_REQUIRED]"
+}

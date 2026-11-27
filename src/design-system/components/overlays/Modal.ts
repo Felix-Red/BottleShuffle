@@ -1,10 +1,16 @@
 import Phaser from 'phaser';
+import {
+  createViewportMetrics,
+  type PartialSafeAreaInsets,
+} from '../../../game/layout/ViewportMetrics';
+import { computeModalBounds } from '../../layout/LayoutConstraints';
 import { DefaultGameTheme, type GameTheme } from '../../theme/GameTheme';
-import { Colors, hexToNumber } from '../../tokens/Colors';
+import { Colors, darkenHex, hexToNumber, lightenHex } from '../../tokens/Colors';
 import { Dimens } from '../../tokens/Dimens';
 import { MotionPresets, resolveMotionDuration } from '../../tokens/Motion';
 import { SemanticShapes } from '../../tokens/Shapes';
 import { createTextStyle, Typography } from '../../tokens/Typography';
+import { BaseButton } from '../buttons/BaseButton';
 import { IconButton } from '../buttons/IconButton';
 import { OutlineButton } from '../buttons/OutlineButton';
 import { PrimaryButton } from '../buttons/PrimaryButton';
@@ -14,6 +20,7 @@ export interface ModalActionConfig {
   readonly label: string;
   readonly onClick: () => void;
   readonly closeOnClick?: boolean;
+  readonly destructive?: boolean;
 }
 
 export interface ModalConfig {
@@ -25,6 +32,7 @@ export interface ModalConfig {
   readonly secondaryAction?: ModalActionConfig;
   readonly dismissible?: boolean;
   readonly width?: number;
+  readonly depth?: number;
   readonly onDismiss?: () => void;
   readonly theme?: GameTheme;
 }
@@ -47,7 +55,7 @@ export class Modal extends Phaser.GameObjects.Container {
   private readonly titleText: Phaser.GameObjects.Text;
   private readonly messageText?: Phaser.GameObjects.Text;
   private readonly closeButton?: IconButton;
-  private readonly primaryButton: PrimaryButton;
+  private readonly primaryButton: BaseButton;
   private readonly secondaryButton?: OutlineButton;
 
   private openState = false;
@@ -63,7 +71,7 @@ export class Modal extends Phaser.GameObjects.Container {
     this.customContent = config.content;
     this.customContentHeight = config.contentHeight ?? 0;
 
-    this.setDepth(MODAL_DEPTH);
+    this.setDepth(config.depth ?? MODAL_DEPTH);
 
     this.backdropGraphics = scene.add.graphics();
     this.backdropBlocker = scene.add.zone(0, 0, scene.scale.width, scene.scale.height).setOrigin(0);
@@ -121,18 +129,47 @@ export class Modal extends Phaser.GameObjects.Container {
       this.dialogContainer.add(this.closeButton);
     }
 
-    this.primaryButton = new PrimaryButton(scene, {
-      label: config.primaryAction.label,
-      width: 170,
-      height: Dimens.ButtonHeightMedium,
-      theme: this.theme,
-      onClick: () => {
-        config.primaryAction.onClick();
-        if (config.primaryAction.closeOnClick ?? true) {
-          this.close(false);
-        }
-      },
-    });
+    const handlePrimaryClick = (): void => {
+      config.primaryAction.onClick();
+      if (config.primaryAction.closeOnClick ?? true) {
+        this.close(false);
+      }
+    };
+
+    if (config.primaryAction.destructive === true) {
+      this.primaryButton = new BaseButton(
+        scene,
+        {
+          label: config.primaryAction.label,
+          width: 170,
+          height: Dimens.ButtonHeightMedium,
+          theme: this.theme,
+          onClick: handlePrimaryClick,
+        },
+        {
+          fillDefault: Colors.Semantic.ErrorDark,
+          fillHover: Colors.Semantic.Error,
+          fillPressed: darkenHex(Colors.Semantic.ErrorDark, 0.2),
+          fillDisabled: Colors.Surface.ElevatedSurface,
+          depthColor: darkenHex(Colors.Semantic.ErrorDark, 0.35),
+          depthColorDisabled: darkenHex(Colors.Surface.Surface, 0.2),
+          borderColorHover: lightenHex(Colors.Semantic.Error, 0.2),
+          textColorDefault: Colors.Text.OnPrimary,
+          textColorDisabled: Colors.Text.Disabled,
+          elevation: 'medium',
+          cornerRadius: SemanticShapes.Button,
+          typography: Typography.LabelLarge,
+        },
+      );
+    } else {
+      this.primaryButton = new PrimaryButton(scene, {
+        label: config.primaryAction.label,
+        width: 170,
+        height: Dimens.ButtonHeightMedium,
+        theme: this.theme,
+        onClick: handlePrimaryClick,
+      });
+    }
     this.dialogContainer.add(this.primaryButton);
 
     if (config.secondaryAction !== undefined) {
@@ -163,16 +200,15 @@ export class Modal extends Phaser.GameObjects.Container {
     return this.openState;
   }
 
-  public open(): this {
+  public open(animate = true): this {
     this.stopTweens();
     this.openState = true;
     this.resize(this.scene.scale.width, this.scene.scale.height);
     this.setVisible(true);
 
-    const duration = resolveMotionDuration(
-      MotionPresets.ModalEntrance.duration,
-      this.theme.reducedMotion,
-    );
+    const duration = animate
+      ? resolveMotionDuration(MotionPresets.ModalEntrance.duration, this.theme.reducedMotion)
+      : 0;
 
     if (duration === 0) {
       this.backdropGraphics.setAlpha(1);
@@ -252,9 +288,26 @@ export class Modal extends Phaser.GameObjects.Container {
     return this;
   }
 
-  public resize(viewportWidth: number, viewportHeight: number): this {
-    const safeW = Math.max(320, viewportWidth);
-    const safeH = Math.max(320, viewportHeight);
+  public resize(
+    viewportWidth: number,
+    viewportHeight: number,
+    safeArea?: PartialSafeAreaInsets,
+  ): this {
+    if (!this.active || !this.titleText.active) {
+      return this;
+    }
+
+    const viewport = createViewportMetrics({
+      width: viewportWidth,
+      height: viewportHeight,
+      ...(safeArea !== undefined ? { safeArea } : {}),
+    });
+    const safeW = viewport.width;
+    const safeH = viewport.height;
+    const bounds = computeModalBounds(viewport, {
+      preferredWidth: this.preferredWidth,
+      maxWidth: this.preferredWidth,
+    });
 
     this.backdropGraphics.clear();
     this.backdropGraphics.fillStyle(
@@ -264,23 +317,25 @@ export class Modal extends Phaser.GameObjects.Container {
     this.backdropGraphics.fillRect(0, 0, safeW, safeH);
     this.backdropBlocker.setSize(safeW, safeH);
 
-    const dialogWidth = Math.min(this.preferredWidth, safeW - Dimens.Space32);
-    const pad = Dimens.ModalPadding;
-    const innerWidth = dialogWidth - pad * 2;
+    const isShort = viewport.effectiveHeight < 420;
+    const dialogWidth = bounds.width;
+    const pad = isShort ? Math.min(bounds.padding, Dimens.Space16) : bounds.padding;
+    const innerWidth = Math.max(180, dialogWidth - pad * 2);
     const titleWrapWidth =
-      this.closeButton !== undefined ? innerWidth - Dimens.Space48 : innerWidth;
+      this.closeButton !== undefined ? Math.max(120, innerWidth - Dimens.Space48) : innerWidth;
 
     this.titleText.setStyle(
       createTextStyle(Typography.HeadlineSmall, {
         color: Colors.Text.Primary,
         align: 'center',
+        scale: isShort ? 0.9 : 1,
         wordWrapWidth: titleWrapWidth,
       }),
     );
 
     let cursorY = pad;
     const titleY = cursorY;
-    cursorY += this.titleText.height + Dimens.Space12;
+    cursorY += this.titleText.height + (isShort ? Dimens.Space8 : Dimens.Space12);
 
     let messageY = cursorY;
     if (this.messageText !== undefined) {
@@ -288,27 +343,28 @@ export class Modal extends Phaser.GameObjects.Container {
         createTextStyle(Typography.BodyMedium, {
           color: Colors.Text.Secondary,
           align: 'center',
+          scale: isShort ? 0.92 : 1,
           wordWrapWidth: innerWidth,
         }),
       );
       messageY = cursorY;
-      cursorY += this.messageText.height + Dimens.Space20;
+      cursorY += this.messageText.height + (isShort ? Dimens.Space12 : Dimens.Space20);
     }
 
     let contentCenterY = cursorY;
     if (this.customContent !== undefined && this.customContentHeight > 0) {
       contentCenterY = cursorY + this.customContentHeight / 2;
-      cursorY += this.customContentHeight + Dimens.Space20;
+      cursorY += this.customContentHeight + (isShort ? Dimens.Space12 : Dimens.Space20);
     }
 
-    const actionsHeight = Dimens.ButtonHeightMedium;
+    const actionsHeight = Math.max(44, isShort ? 44 : Dimens.ButtonHeightMedium);
     const actionsCenterY = cursorY + actionsHeight / 2;
     cursorY += actionsHeight + pad;
 
-    const dialogHeight = cursorY;
+    const dialogHeight = Math.min(bounds.maxHeight, cursorY);
     const halfH = dialogHeight / 2;
 
-    this.dialogContainer.setPosition(safeW / 2, safeH / 2);
+    this.dialogContainer.setPosition(bounds.centerX, bounds.centerY);
     this.dialogBlocker.setSize(dialogWidth, dialogHeight);
 
     drawElevatedSurface(this.dialogSurface, {
@@ -335,18 +391,18 @@ export class Modal extends Phaser.GameObjects.Container {
       );
     }
 
-    const actionY = actionsCenterY - halfH;
+    const clampedActionY = Math.min(halfH - pad - actionsHeight / 2, actionsCenterY - halfH);
     if (this.secondaryButton !== undefined) {
-      const gap = Dimens.Space12;
-      const btnWidth = Math.max(112, Math.floor((innerWidth - gap) / 2));
+      const gap = isShort ? Dimens.Space8 : Dimens.Space12;
+      const btnWidth = Math.max(100, Math.floor((innerWidth - gap) / 2));
       this.secondaryButton.setButtonSize(btnWidth, actionsHeight);
       this.primaryButton.setButtonSize(btnWidth, actionsHeight);
-      this.secondaryButton.setPosition(-(btnWidth / 2 + gap / 2), actionY);
-      this.primaryButton.setPosition(btnWidth / 2 + gap / 2, actionY);
+      this.secondaryButton.setPosition(-(btnWidth / 2 + gap / 2), clampedActionY);
+      this.primaryButton.setPosition(btnWidth / 2 + gap / 2, clampedActionY);
     } else {
       const btnWidth = Math.min(innerWidth, 240);
       this.primaryButton.setButtonSize(btnWidth, actionsHeight);
-      this.primaryButton.setPosition(0, actionY);
+      this.primaryButton.setPosition(0, clampedActionY);
     }
 
     return this;

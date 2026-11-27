@@ -133,6 +133,7 @@ Measured directly from `public/assets/` on disk:
 
 - **Total visual runtime assets (20 files):** `1,461,052 bytes` (**1.39 MB**).
 - **Local fonts (`Fredoka` + `Nunito` WOFF2 + OFL notices):** ~`115 KB`.
+- **Audio runtime assets (15 `.m4a` files — 13 essential SFX + 2 deferred music loops):** `293,051 bytes` (**286.2 KB**; see `docs/AUDIO.md` and `public/assets/audio/ATTRIBUTION.md`).
 - **Optimisation note:** Bottle PNGs and `selection-glow.png` are currently stored as standard lossless RGBA PNGs encoded via Chromium Canvas. Converting them to WebP or running lossless PNG palette/compression optimisation in a future bundle-tuning pass can reduce the visual asset footprint by ~70–85% if tighter YouTube Playables initial-bundle margins are needed.
 
 ---

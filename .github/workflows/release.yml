@@ -1,0 +1,71 @@
+name: Bottle Shuffle Release Packaging
+
+on:
+  workflow_dispatch:
+    inputs:
+      skip_e2e:
+        description: 'Skip Playwright E2E (not recommended for release candidates)'
+        required: false
+        default: false
+        type: boolean
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify-and-package:
+    name: Verify, Package & Smoke-Test Release Candidate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run full release verification checks
+        run: npm run release:check
+
+      - name: Install Playwright Chromium browser
+        if: ${{ !inputs.skip_e2e }}
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright E2E suite against production preview
+        if: ${{ !inputs.skip_e2e }}
+        run: npm run test:e2e
+
+      - name: Package YouTube Playables release ZIP, SHA-256 & manifest
+        run: npm run package:release -- --force
+
+      - name: Verify archive SHA-256 checksum
+        working-directory: release/packages
+        run: sha256sum -c bottle-shuffle-*.sha256
+
+      - name: Smoke-test extracted ZIP archive over HTTP
+        if: ${{ !inputs.skip_e2e }}
+        run: npm run smoke:release
+
+      - name: Upload release candidate artefacts (manual portal submission only)
+        uses: actions/upload-artifact@v4
+        with:
+          name: bottle-shuffle-release-${{ github.ref_name }}
+          path: |
+            release/packages/bottle-shuffle-*.zip
+            release/packages/bottle-shuffle-*.sha256
+            release/packages/bottle-shuffle-*-manifest.json
+            release/metadata/game-metadata.json
+            release/promotional/promotional-manifest.json
+          retention-days: 30

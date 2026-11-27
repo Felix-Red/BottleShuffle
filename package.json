@@ -1,12 +1,13 @@
 {
   "name": "bottle-shuffle",
-  "version": "0.1.0",
+  "version": "1.0.0-rc.1",
   "private": true,
   "type": "module",
   "description": "Bottle Shuffle — a casual logic and deduction puzzle game built with Phaser 3 and TypeScript for YouTube Playables.",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "build:youtube": "tsc --noEmit && vite build --mode youtube && node scripts/verify-youtube-build.mjs",
     "preview": "vite preview",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -15,14 +16,30 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "test:stress": "node scripts/stress-test-puzzles.mjs",
+    "validate:campaign": "node scripts/validate-campaign.mjs",
+    "validate:assets": "node scripts/validate-assets.mjs",
+    "analyse:bundle": "node scripts/analyse-bundle.mjs",
+    "verify:build": "node scripts/verify-youtube-build.mjs",
+    "validate:metadata": "node scripts/validate-metadata.mjs",
+    "verify:release": "node scripts/verify-release.mjs",
+    "package:release": "node scripts/package-release.mjs",
+    "smoke:release": "node scripts/smoke-test-release.mjs",
+    "release:check": "npm run qa && npm run validate:metadata && npm run verify:release",
+    "qa": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run validate:campaign && npm run build:youtube && npm run validate:assets && npm run analyse:bundle",
     "puzzle:inspect": "node scripts/inspect-puzzle.mjs",
-    "gameplay:simulate": "node scripts/simulate-gameplay.mjs"
+    "gameplay:simulate": "node scripts/simulate-gameplay.mjs",
+    "levels:calibrate": "node scripts/calibrate-levels.mjs"
   },
   "dependencies": {
     "phaser": "^3.90.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.65.1",
+    "@vitest/coverage-v8": "^5.1.2",
     "eslint": "^10.15.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.14.0",

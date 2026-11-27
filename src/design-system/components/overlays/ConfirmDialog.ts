@@ -7,6 +7,8 @@ export interface ConfirmDialogConfig {
   readonly message: string;
   readonly confirmLabel?: string;
   readonly cancelLabel?: string;
+  readonly destructive?: boolean;
+  readonly depth?: number;
   readonly dismissible?: boolean;
   readonly onConfirm: () => void;
   readonly onCancel?: () => void;
@@ -21,14 +23,18 @@ export class ConfirmDialog {
       title: config.title,
       message: config.message,
       dismissible: config.dismissible ?? true,
+      ...(config.depth !== undefined ? { depth: config.depth } : {}),
       ...(config.theme !== undefined ? { theme: config.theme } : {}),
       ...(config.onCancel !== undefined ? { onDismiss: config.onCancel } : {}),
       primaryAction: {
         label: config.confirmLabel ?? 'Confirm',
+        closeOnClick: false,
+        ...(config.destructive !== undefined ? { destructive: config.destructive } : {}),
         onClick: config.onConfirm,
       },
       secondaryAction: {
         label: config.cancelLabel ?? 'Cancel',
+        closeOnClick: false,
         onClick: () => {
           config.onCancel?.();
         },

@@ -14,10 +14,11 @@ const RASTER_JOBS = [
   ...['red', 'blue', 'green', 'yellow', 'purple', 'orange', 'pink', 'teal', 'brown', 'silver'].map(
     (id) => ({
       src: `artwork/bottles/${id}.svg`,
-      dest: `public/assets/bottles/${id}.png`,
+      dest: `public/assets/bottles/${id}.webp`,
       width: 256,
       height: 512,
-      mime: 'image/png',
+      mime: 'image/webp',
+      quality: 0.94,
     }),
   ),
   {
@@ -65,10 +66,11 @@ const RASTER_JOBS = [
   },
   {
     src: 'artwork/effects/selection-glow.svg',
-    dest: 'public/assets/effects/selection-glow.png',
+    dest: 'public/assets/effects/selection-glow.webp',
     width: 320,
     height: 576,
-    mime: 'image/png',
+    mime: 'image/webp',
+    quality: 0.92,
   },
   {
     src: 'artwork/effects/sparkle.svg',

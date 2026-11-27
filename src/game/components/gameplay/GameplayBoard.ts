@@ -122,6 +122,70 @@ export class GameplayBoard extends Phaser.GameObjects.Container {
     };
   }
 
+  public getSlotScreenBounds(slotIndex: number): {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+  } | null {
+    const rackLayout = this.rack.getLayout();
+    if (slotIndex < 0 || slotIndex >= rackLayout.bottleCount) {
+      return null;
+    }
+    const pos = this.rack.getSlotWorldPosition(slotIndex);
+    const w = rackLayout.bottleWidth;
+    const h = rackLayout.bottleHeight;
+    // BottleSprite uses bottom-center origin (0.5, 1) resting on the wooden shelf
+    return {
+      x: Math.round(this.x + pos.x - w / 2),
+      y: Math.round(this.y + pos.y - h),
+      width: Math.round(w),
+      height: Math.round(h),
+    };
+  }
+
+  public getHiddenRackScreenBounds(): {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+  } {
+    const comp = this.hiddenRack.getCompartmentBounds();
+    const w = comp.width * this.hiddenRack.scaleX;
+    const h = comp.height * this.hiddenRack.scaleY;
+    return {
+      x: Math.round(this.x + this.hiddenRack.x - w / 2),
+      y: Math.round(this.y + this.hiddenRack.y - h / 2),
+      width: Math.round(w),
+      height: Math.round(h),
+    };
+  }
+
+  /**
+   * Rebuilds the visual racks and bottle sprites in place when switching between
+   * tutorial fixtures with different bottle counts or bottle sets.
+   */
+  public loadSequence(
+    sequence: readonly BottleId[],
+    layout: GameplayBoardLayout,
+    safeBounds?: SafeTrajectoryBounds,
+  ): this {
+    this.stopSwapTweens();
+    this.currentSequence = [...sequence];
+    for (const sprite of this.spritesById.values()) {
+      sprite.destroy();
+    }
+    this.spritesById.clear();
+    this.bottlesLayer.removeAll(true);
+
+    this.rack.setBottleCount(sequence.length);
+    this.hiddenRack.setSlotCount(sequence.length);
+    this.applyLayout(layout, safeBounds);
+    this.createBottleSprites(sequence);
+    this.reconcileBottlePositions(sequence);
+    return this;
+  }
+
   public syncState(
     sequence: readonly BottleId[],
     selectedSlotIndex: number | null,
@@ -167,6 +231,7 @@ export class GameplayBoard extends Phaser.GameObjects.Container {
     secondIndex: number,
     nextSequence: readonly BottleId[],
     onComplete: () => void,
+    onLanding?: () => void,
   ): () => void {
     this.stopSwapTweens();
     this.currentSequence = [...nextSequence];
@@ -184,6 +249,7 @@ export class GameplayBoard extends Phaser.GameObjects.Container {
 
     if (spriteMovingToFirst === undefined || spriteMovingToSecond === undefined) {
       this.reconcileBottlePositions(nextSequence);
+      onLanding?.();
       onComplete();
       return () => undefined;
     }
@@ -199,6 +265,7 @@ export class GameplayBoard extends Phaser.GameObjects.Container {
       bottlesLayer: this.bottlesLayer,
       policy: this.policy,
       ...(this.safeBounds !== undefined ? { bounds: this.safeBounds } : {}),
+      ...(onLanding !== undefined ? { onLanding } : {}),
       onComplete: () => {
         this.cancelSwapAnimation = undefined;
         this.reconcileBottlePositions(this.currentSequence);
@@ -254,6 +321,8 @@ export class GameplayBoard extends Phaser.GameObjects.Container {
         y: slotPos.y,
         width: rackLayout.bottleWidth,
         height: rackLayout.bottleHeight,
+        hitWidth: rackLayout.hitWidth,
+        hitHeight: rackLayout.hitHeight,
         theme: this.theme,
         onInteract: (clickedId) => {
           const currentSlotIndex = this.currentSequence.indexOf(clickedId);
@@ -283,7 +352,12 @@ export class GameplayBoard extends Phaser.GameObjects.Container {
       }
       const pos = this.rack.getSlotWorldPosition(slotIndex);
       sprite.resetVisualTransform();
-      sprite.setDisplayDimensions(rackLayout.bottleWidth, rackLayout.bottleHeight);
+      sprite.setDisplayDimensions(
+        rackLayout.bottleWidth,
+        rackLayout.bottleHeight,
+        rackLayout.hitWidth,
+        rackLayout.hitHeight,
+      );
       sprite.setPosition(pos.x, pos.y);
     }
   }

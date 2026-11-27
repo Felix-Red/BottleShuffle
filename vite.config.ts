@@ -8,6 +8,19 @@ export default defineConfig({
     emptyOutDir: true,
     sourcemap: false,
     chunkSizeWarningLimit: 1600,
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            {
+              name: 'vendor-phaser',
+              test: /node_modules\/phaser/,
+              priority: 20,
+            },
+          ],
+        },
+      },
+    },
   },
   server: {
     host: true,

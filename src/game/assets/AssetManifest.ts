@@ -1,5 +1,10 @@
 import type Phaser from 'phaser';
 import {
+  getDeferredAudioEntries,
+  getEssentialAudioEntries,
+  type AudioCatalogEntry,
+} from '../../services/audio/AudioCatalog';
+import {
   ASSET_KEYS,
   BOTTLE_TEXTURE_KEYS,
   EFFECT_TEXTURE_KEYS,
@@ -22,7 +27,7 @@ export const ASSET_MANIFEST: readonly AssetManifestEntry[] = [
   ...BOTTLE_CATALOG.map((entry): AssetManifestEntry => ({
     key: BOTTLE_TEXTURE_KEYS[entry.id],
     kind: 'image',
-    path: `./assets/bottles/${entry.id}.png`,
+    path: `./assets/bottles/${entry.id}.webp`,
   })),
   {
     key: ENVIRONMENT_TEXTURE_KEYS.BACKGROUND,
@@ -57,7 +62,7 @@ export const ASSET_MANIFEST: readonly AssetManifestEntry[] = [
   {
     key: EFFECT_TEXTURE_KEYS.SELECTION_GLOW,
     kind: 'image',
-    path: './assets/effects/selection-glow.png',
+    path: './assets/effects/selection-glow.webp',
   },
   {
     key: EFFECT_TEXTURE_KEYS.SPARKLE,
@@ -130,4 +135,63 @@ export function queueAssetManifest(
   }
 
   return { queuedCount, skippedCount };
+}
+
+function queueAudioEntries(
+  scene: Phaser.Scene,
+  entries: readonly AudioCatalogEntry[],
+  onError?: (key: string, path: string) => void,
+): AssetPreloadReport {
+  let queuedCount = 0;
+  let skippedCount = 0;
+
+  const handleLoadError = (file: Phaser.Loader.File): void => {
+    const key = file.key;
+    const url =
+      typeof file.src === 'string'
+        ? file.src
+        : typeof file.url === 'string'
+          ? file.url
+          : '<unknown>';
+    console.warn(`[AssetManifest] Audio asset "${key}" failed to load from "${url}".`);
+    onError?.(key, url);
+  };
+
+  scene.load.on('loaderror', handleLoadError);
+  scene.load.once('complete', () => {
+    scene.load.off('loaderror', handleLoadError);
+  });
+
+  for (const entry of entries) {
+    if (scene.cache.audio.exists(entry.id)) {
+      skippedCount += 1;
+      continue;
+    }
+    scene.load.audio(entry.id, entry.path);
+    queuedCount += 1;
+  }
+
+  return { queuedCount, skippedCount };
+}
+
+/**
+ * Queues lightweight, essential sound effects during BootScene preload so UI and
+ * gameplay feedback are ready immediately without inflating startup time.
+ */
+export function queueEssentialAudioAssets(
+  scene: Phaser.Scene,
+  onError?: (key: string, path: string) => void,
+): AssetPreloadReport {
+  return queueAudioEntries(scene, getEssentialAudioEntries(), onError);
+}
+
+/**
+ * Queues background music loops for non-blocking deferred loading after the
+ * first playable frame is presented.
+ */
+export function queueDeferredMusicAssets(
+  scene: Phaser.Scene,
+  onError?: (key: string, path: string) => void,
+): AssetPreloadReport {
+  return queueAudioEntries(scene, getDeferredAudioEntries(), onError);
 }

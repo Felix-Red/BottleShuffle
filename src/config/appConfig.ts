@@ -1,7 +1,11 @@
+export const APP_VERSION = '1.0.0-rc.1';
+export const CAMPAIGN_CATALOG_VERSION = '1.0.0';
+
 export const APP_METADATA = {
   title: 'BOTTLE SHUFFLE',
-  version: '0.1.0',
-  buildLabel: 'Development build · v0.1.0',
+  version: APP_VERSION,
+  campaignCatalogVersion: CAMPAIGN_CATALOG_VERSION,
+  buildLabel: `Release Candidate · v${APP_VERSION}`,
   statusLabel: 'Engine initialised',
   studioLabel: 'CROWDARCADE',
   containerId: 'game-container',

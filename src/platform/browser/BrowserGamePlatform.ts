@@ -1,9 +1,16 @@
+import { PLATFORM_CONFIG } from '../../config/PlatformConfig';
+import type { AdvertisingProvider } from '../contracts/AdvertisingProvider';
 import type {
   AudioChangeCallback,
   GamePlatform,
   LifecycleCallback,
   Unsubscribe,
 } from '../contracts/GamePlatform';
+import type { PlatformCapabilities } from '../contracts/PlatformCapabilities';
+import type { SaveStorage } from '../contracts/SaveStorage';
+import { createBrowserCapabilities } from '../youtube/YouTubeCapabilities';
+import { BrowserSaveStorage } from './BrowserSaveStorage';
+import { NoOpAdvertisingProvider } from './NoOpAdvertisingProvider';
 
 export interface StorageLike {
   getItem(key: string): string | null;
@@ -21,6 +28,8 @@ export interface BrowserGamePlatformOptions {
   readonly storageKey?: string;
   readonly documentRef?: VisibilityDocumentLike | null;
   readonly initialAudioEnabled?: boolean;
+  readonly vibrationSupported?: boolean;
+  readonly vibrateFn?: ((pattern: number | number[]) => boolean) | null;
 }
 
 const DEFAULT_STORAGE_KEY = 'bottle-shuffle:save-data:v1';
@@ -37,12 +46,25 @@ function resolveDefaultDocument(): VisibilityDocumentLike | null {
   return typeof globalThis.document !== 'undefined' ? globalThis.document : null;
 }
 
+function detectBrowserVibrationSupport(): boolean {
+  try {
+    return (
+      typeof globalThis.navigator !== 'undefined' &&
+      typeof globalThis.navigator.vibrate === 'function'
+    );
+  } catch {
+    return false;
+  }
+}
+
 export class BrowserGamePlatform implements GamePlatform {
   public readonly name = 'browser';
 
   private readonly storage: StorageLike | null;
   private readonly storageKey: string;
   private readonly documentRef: VisibilityDocumentLike | null;
+  private readonly vibrationSupported: boolean;
+  private readonly vibrateFn: ((pattern: number | number[]) => boolean) | null;
 
   private readonly pauseListeners = new Set<LifecycleCallback>();
   private readonly resumeListeners = new Set<LifecycleCallback>();
@@ -53,6 +75,9 @@ export class BrowserGamePlatform implements GamePlatform {
   private gameReadyNotified = false;
   private audioEnabled: boolean;
   private memoryFallback: string | null = null;
+  private saveStorage?: BrowserSaveStorage;
+  private readonly advertisingProvider = new NoOpAdvertisingProvider();
+  private hostPaused = false;
 
   private readonly handleVisibilityChange = (): void => {
     if (this.documentRef === null) {
@@ -60,10 +85,12 @@ export class BrowserGamePlatform implements GamePlatform {
     }
 
     if (this.documentRef.hidden) {
+      this.hostPaused = true;
       for (const listener of this.pauseListeners) {
         listener();
       }
     } else {
+      this.hostPaused = false;
       for (const listener of this.resumeListeners) {
         listener();
       }
@@ -76,6 +103,13 @@ export class BrowserGamePlatform implements GamePlatform {
     this.documentRef =
       options.documentRef === undefined ? resolveDefaultDocument() : options.documentRef;
     this.audioEnabled = options.initialAudioEnabled ?? true;
+    this.vibrationSupported = options.vibrationSupported ?? detectBrowserVibrationSupport();
+    this.vibrateFn =
+      options.vibrateFn !== undefined
+        ? options.vibrateFn
+        : detectBrowserVibrationSupport()
+          ? (pattern) => globalThis.navigator.vibrate(pattern)
+          : null;
   }
 
   public initialize(): Promise<void> {
@@ -131,8 +165,65 @@ export class BrowserGamePlatform implements GamePlatform {
     return Promise.resolve();
   }
 
+  public getSaveStorage(): SaveStorage {
+    this.saveStorage ??= new BrowserSaveStorage();
+    return this.saveStorage;
+  }
+
+  public getAdvertisingProvider(): AdvertisingProvider {
+    return this.advertisingProvider;
+  }
+
+  public isHostPaused(): boolean {
+    return this.hostPaused;
+  }
+
+  public getCapabilities(): PlatformCapabilities {
+    return createBrowserCapabilities({
+      localStorageAvailable: this.storage !== null,
+      vibrationSupported: this.vibrationSupported,
+    });
+  }
+
+  public getLanguage(): Promise<string> {
+    return Promise.resolve(PLATFORM_CONFIG.browser.defaultLanguage);
+  }
+
+  public logHealthError(): void {
+    // No external telemetry in standalone browser mode.
+  }
+
   public isAudioEnabled(): boolean {
     return this.audioEnabled;
+  }
+
+  public isVibrationSupported(): boolean {
+    return this.vibrationSupported;
+  }
+
+  public vibrate(pattern: number | readonly number[]): boolean {
+    if (!this.vibrationSupported || this.vibrateFn === null) {
+      return false;
+    }
+
+    try {
+      const normalized = typeof pattern === 'number' ? pattern : [...pattern];
+      return this.vibrateFn(normalized);
+    } catch {
+      return false;
+    }
+  }
+
+  public cancelVibration(): void {
+    if (!this.vibrationSupported || this.vibrateFn === null) {
+      return;
+    }
+
+    try {
+      this.vibrateFn(0);
+    } catch {
+      // Ignore host vibration cancellation errors.
+    }
   }
 
   public setAudioEnabled(enabled: boolean): void {
@@ -173,6 +264,9 @@ export class BrowserGamePlatform implements GamePlatform {
       this.initialized = false;
     }
 
+    this.advertisingProvider.dispose();
+    this.saveStorage?.dispose();
+    this.saveStorage = undefined;
     this.pauseListeners.clear();
     this.resumeListeners.clear();
     this.audioListeners.clear();

@@ -148,3 +148,13 @@ Implemented in `BottleSprite` (`src/game/components/bottles/BottleSprite.ts`) an
 - **Unit tests (`tests/unit/animations/`):** Deterministic coverage for Bezier/curve math & bounds clamping, shadow/deformation/tilt math, normal vs reduced vs slow-motion policies, `MotionPreferenceService` listener lifecycle, `AnimationCoordinator` cancellation/epoch guards, and aggregate match-feedback labels.
 - **Integration tests (`tests/integration/AnimationIntegration.test.ts`):** Verifies swap sequencing, rapid tap blocking, mid-swap pause/resize/suspend/restart/shutdown reconciliation, single completion per attempt, and reduced-motion rule parity.
 - **Known limitations:** Interactive pointer/touch drag-and-drop swapping, audio SFX/music, final victory screen, scoring/star ratings, and persistent reduced-motion settings storage remain intentionally deferred to later tasks.
+
+## Task 13 Update — Settings-Driven Reduced Motion
+
+`MotionPreferenceService` now binds to the shared `SettingsService` (`'system' | 'reduced'`) while guaranteeing OS `prefers-reduced-motion: reduce` is always honoured. Reduced-motion changes reconcile active swap animations safely via `AnimationCoordinator` without resetting the puzzle attempt.
+
+---
+
+## Resize & Orientation Animation Interruption (Task 16)
+
+- Live viewport or orientation changes received by `GameScene` (via `Phaser.Scale.Events.RESIZE` or `ResponsiveLayoutService`) cancel active swap curves through `AnimationCoordinator.cancelActiveSwap()`, reconcile logical bottle positions exactly once, and recalculate safe swap trajectory bounds (`contentBounds`) before re-rendering. See [RESPONSIVE_LAYOUT.md](./RESPONSIVE_LAYOUT.md).

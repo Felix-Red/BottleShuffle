@@ -1,7 +1,17 @@
-import type { BottleId, PuzzleStatus, SwapResult } from '../../core';
+import type { BottleId, LevelId, PuzzleStatus, SwapResult } from '../../core';
 import type { MatchFeedbackTone } from '../../config/GameplayConfig';
+import type { VictoryViewState } from '../victory/VictoryViewState';
+import type { GameplayMode } from './GameplaySceneData';
 
-export type GameplayOverlayMode = 'none' | 'pause' | 'restart_confirm' | 'completed' | 'error';
+export type GameplayOverlayMode =
+  | 'none'
+  | 'pause'
+  | 'settings'
+  | 'restart_confirm'
+  | 'exit_confirm'
+  | 'tutorial_confirm'
+  | 'completed'
+  | 'error';
 
 export interface MatchFeedbackView {
   readonly text: string;
@@ -23,6 +33,13 @@ export interface PendingSwapTransition {
  * Deliberately excludes private puzzle data (targetSequence, seed, individual matches).
  */
 export interface GameplayViewState {
+  readonly mode: GameplayMode;
+  readonly levelId: LevelId | null;
+  readonly levelNumber: number | null;
+  readonly chapterName: string | null;
+  readonly nextLevelId: LevelId | null;
+  readonly nextLevelNumber: number | null;
+  readonly isCampaignComplete: boolean;
   readonly puzzleId: string;
   readonly attemptId: number;
   readonly headerTitle: string;
@@ -37,10 +54,12 @@ export interface GameplayViewState {
   readonly bestMatchCount: number;
   readonly formattedTime: string;
   readonly status: PuzzleStatus;
+  readonly isSuspended: boolean;
   readonly inputEnabled: boolean;
   readonly isSwapping: boolean;
   readonly instructionText: string;
   readonly matchFeedback: MatchFeedbackView | null;
+  readonly victory: VictoryViewState | null;
   readonly overlayMode: GameplayOverlayMode;
   readonly errorMessage: string | null;
 }

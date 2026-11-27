@@ -3,6 +3,7 @@ import { hexToNumber } from '../../tokens/Colors';
 
 export type DesignIconName =
   | 'back'
+  | 'next'
   | 'close'
   | 'play'
   | 'pause'
@@ -21,16 +22,16 @@ export type DesignIconName =
   | 'error'
   | 'plus'
   | 'minus'
-  | 'sparkles';
+  | 'sparkles'
+  | 'grid';
 
-function drawStarPolygon(
-  graphics: Phaser.GameObjects.Graphics,
+function buildStarVertices(
   cx: number,
   cy: number,
   outerRadius: number,
   innerRadius: number,
   points = 5,
-): void {
+): { x: number; y: number }[] {
   const vertices: { x: number; y: number }[] = [];
   const step = Math.PI / points;
   let angle = -Math.PI / 2;
@@ -44,7 +45,33 @@ function drawStarPolygon(
     angle += step;
   }
 
-  graphics.fillPoints(vertices, true);
+  return vertices;
+}
+
+function drawStarPolygon(
+  graphics: Phaser.GameObjects.Graphics,
+  cx: number,
+  cy: number,
+  outerRadius: number,
+  innerRadius: number,
+  points = 5,
+): void {
+  graphics.fillPoints(buildStarVertices(cx, cy, outerRadius, innerRadius, points), true);
+}
+
+export function drawStarOutline(
+  graphics: Phaser.GameObjects.Graphics,
+  cx: number,
+  cy: number,
+  size: number,
+  colorHex: string,
+  lineWidth = 2,
+  alpha = 1,
+): void {
+  const r = size * 0.45;
+  const vertices = buildStarVertices(cx, cy, r * 0.92, r * 0.42, 5);
+  graphics.lineStyle(lineWidth, hexToNumber(colorHex), alpha);
+  graphics.strokePoints(vertices, true);
 }
 
 export function drawIcon(
@@ -69,6 +96,14 @@ export function drawIcon(
       graphics.moveTo(cx + r * 0.35, cy - r * 0.72);
       graphics.lineTo(cx - r * 0.42, cy);
       graphics.lineTo(cx + r * 0.35, cy + r * 0.72);
+      graphics.strokePath();
+      break;
+    }
+    case 'next': {
+      graphics.beginPath();
+      graphics.moveTo(cx - r * 0.35, cy - r * 0.72);
+      graphics.lineTo(cx + r * 0.42, cy);
+      graphics.lineTo(cx - r * 0.35, cy + r * 0.72);
       graphics.strokePath();
       break;
     }
@@ -299,6 +334,17 @@ export function drawIcon(
     }
     case 'sparkles': {
       drawStarPolygon(graphics, cx, cy, r * 0.88, r * 0.24, 4);
+      break;
+    }
+    case 'grid': {
+      const gap = Math.max(2, r * 0.24);
+      const cell = r * 0.68;
+      const offset = (cell + gap) / 2;
+      const radius = Math.max(1.5, cell * 0.28);
+      graphics.fillRoundedRect(cx - offset - cell / 2, cy - offset - cell / 2, cell, cell, radius);
+      graphics.fillRoundedRect(cx + offset - cell / 2, cy - offset - cell / 2, cell, cell, radius);
+      graphics.fillRoundedRect(cx - offset - cell / 2, cy + offset - cell / 2, cell, cell, radius);
+      graphics.fillRoundedRect(cx + offset - cell / 2, cy + offset - cell / 2, cell, cell, radius);
       break;
     }
   }

@@ -97,3 +97,10 @@ When Task 04+ introduces the pure puzzle engine (`src/core/`):
 - Interactive hit areas enforce ≥48px touch targets via `ensureMinimumTouchTarget()`.
 - Reduced-motion settings disable continuous pulses and collapse pose transitions cleanly.
 - **Known canvas limitation:** Individual Phaser canvas sprites are not natively exposed to browser screen readers or DOM Tab focus; `BottleCatalogEntry.accessibleLabel` provides structured labels ready for future keyboard navigation or DOM accessibility overlays.
+
+---
+
+## Responsive Bottle Rack & Non-Overlapping Hit Areas (Task 16)
+
+- `src/game/layout/BottleRackLayout.ts` (consolidating `bottleLayout.ts`) evaluates 1-row vs 2-row visual sizing strictly within both width and height budgets, preserving the exact `1:2` bottle aspect ratio across all 14 viewports and `3–10` bottle counts.
+- Visual bottle dimensions are separated from non-overlapping interactive hit rects (`hitWidth`, `hitHeight`, `hitRect`) wired into `BottleSprite` and `GameplayBoard`. See [RESPONSIVE_LAYOUT.md](./RESPONSIVE_LAYOUT.md).

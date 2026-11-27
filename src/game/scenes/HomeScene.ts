@@ -1,131 +1,201 @@
 import Phaser from 'phaser';
-import { APP_METADATA } from '../../config/appConfig';
-import { ALL_DIFFICULTY_DEFINITIONS, type DifficultyId } from '../../core';
+import { HOME_CONFIG } from '../../config/HomeConfig';
 import {
   Colors,
+  createGameTheme,
   createTextStyle,
-  DefaultGameTheme,
-  Dimens,
-  GameCard,
   hexToNumber,
-  lightenHex,
+  IconButton,
+  Modal,
+  MotionDurations,
+  MotionEasings,
   OutlineButton,
-  PrimaryButton,
-  SecondaryButton,
+  resolveMotionDuration,
   Typography,
+  type GameTheme,
 } from '../../design-system';
-import type { GamePlatform } from '../../platform/contracts/GamePlatform';
+import type { GamePlatform, Unsubscribe } from '../../platform/contracts/GamePlatform';
+import { MotionPreferenceService } from '../../services/MotionPreferenceService';
+import type { GameReadinessService } from '../../services/platform/GameReadinessService';
+import type { ResponsiveLayoutService } from '../../services/ResponsiveLayoutService';
+import { SettingsService } from '../../services/SettingsService';
+import type { TutorialPreferenceService } from '../../services/TutorialPreferenceService';
+import type { SaveService } from '../../services/persistence/SaveService';
+import type { SaveLifecycleStatus } from '../../services/persistence/SaveStatus';
+import type { SceneAudioCoordinator } from '../audio/SceneAudioCoordinator';
 import { GameBackground } from '../components/environment/GameBackground';
-import type { GameplaySceneData } from '../gameplay/GameplaySceneData';
+import { CampaignProgressCard } from '../components/home/CampaignProgressCard';
+import { ContinueButton } from '../components/home/ContinueButton';
+import { GameLogo } from '../components/home/GameLogo';
+import { HomeHero } from '../components/home/HomeHero';
+import { PracticeModeDialog } from '../components/home/PracticeModeDialog';
+import { SaveStatusToastCoordinator } from '../components/persistence/SaveStatusToastCoordinator';
+import { SettingsOverlay } from '../components/settings/SettingsOverlay';
+import { HomeController } from '../home/HomeController';
+import type { HomeOverlayMode, HomeViewState } from '../home/HomeViewState';
+import { calculateHomeLayout } from '../layout/HomeLayout';
+import { PhaserSceneNavigator } from '../navigation/SceneNavigator';
+import type { ProgressionController } from '../progression/ProgressionController';
 import { SCENE_KEYS } from './sceneKeys';
 
-interface BottleSpec {
-  readonly offsetX: number;
-  readonly offsetY: number;
-  readonly angleDeg: number;
-  readonly bodyColor: number;
-  readonly labelColor: number;
+export interface HomeSceneOptions {
+  /** Development-only initial dialog preview (ignored in production builds). */
+  readonly devInitialDialog?: 'practice' | 'settings';
 }
 
-const EMBLEM_BOTTLES: readonly BottleSpec[] = [
-  {
-    offsetX: -40,
-    offsetY: 2,
-    angleDeg: -11,
-    bodyColor: hexToNumber(Colors.Bottle.Red),
-    labelColor: hexToNumber(lightenHex(Colors.Bottle.Red, 0.2)),
-  },
-  {
-    offsetX: 0,
-    offsetY: 0,
-    angleDeg: 0,
-    bodyColor: hexToNumber(Colors.Brand.PrimaryLight),
-    labelColor: hexToNumber(lightenHex(Colors.Brand.PrimaryLight, 0.2)),
-  },
-  {
-    offsetX: 40,
-    offsetY: 2,
-    angleDeg: 11,
-    bodyColor: hexToNumber(Colors.Bottle.Green),
-    labelColor: hexToNumber(lightenHex(Colors.Bottle.Green, 0.2)),
-  },
-];
-
+/**
+ * Production Home Screen for Bottle Shuffle.
+ * Presents the playful brand identity, expressive decorative bottle hero, dominant
+ * single-tap Play/Continue CTA, Levels & Practice navigation, live CampaignProgressCard,
+ * and working Settings access across landscape and portrait viewports.
+ */
 export class HomeScene extends Phaser.Scene {
   private readonly platform: GamePlatform;
-  private selectedDifficulty: DifficultyId = 'normal';
+  private readonly progressionController: ProgressionController;
+  private readonly sharedMotionPreference?: MotionPreferenceService;
+  private readonly sharedSettingsService?: SettingsService;
+  private readonly tutorialPreference?: TutorialPreferenceService;
+  private readonly audioCoordinator?: SceneAudioCoordinator;
+  private readonly saveService?: SaveService;
+  private readonly shownSaveWarnings?: Set<SaveLifecycleStatus>;
+  private readonly responsiveService?: ResponsiveLayoutService;
+  private readonly readinessService?: GameReadinessService;
+  private readonly options: HomeSceneOptions;
+
+  private motionPreference?: MotionPreferenceService;
+  private ownsMotionPreference = false;
+  private settingsService?: SettingsService;
+  private ownsSettingsService = false;
+  private theme: GameTheme = createGameTheme();
+
+  private controller?: HomeController;
+  private navigator?: PhaserSceneNavigator;
 
   private background?: GameBackground;
-  private contentContainer?: Phaser.GameObjects.Container;
-  private footerText?: Phaser.GameObjects.Text;
+  private publisherText?: Phaser.GameObjects.Text;
+  private settingsButton?: IconButton;
+  private logo?: GameLogo;
+  private taglineText?: Phaser.GameObjects.Text;
+  private hero?: HomeHero;
+  private continueButton?: ContinueButton;
+  private levelsButton?: OutlineButton;
+  private practiceButton?: OutlineButton;
+  private progressCard?: CampaignProgressCard;
 
-  public constructor(platform: GamePlatform) {
+  private practiceDialog?: PracticeModeDialog;
+  private settingsOverlay?: SettingsOverlay;
+  private errorModal?: Modal;
+  private saveToastCoordinator?: SaveStatusToastCoordinator;
+
+  private activeOverlayMode: HomeOverlayMode = 'none';
+  private entranceTweens: Phaser.Tweens.Tween[] = [];
+  private lastKnownCompletedCount: number | null = null;
+  private devInitialDialogConsumed = false;
+
+  private unsubscribePlatformPause?: Unsubscribe;
+  private unsubscribePlatformResume?: Unsubscribe;
+  private unsubscribeMotion?: Unsubscribe;
+  private unsubscribeResponsive?: Unsubscribe;
+
+  public constructor(
+    platform: GamePlatform,
+    progressionController: ProgressionController,
+    motionPreference?: MotionPreferenceService,
+    options: HomeSceneOptions = {},
+    tutorialPreference?: TutorialPreferenceService,
+    settingsService?: SettingsService,
+    audioCoordinator?: SceneAudioCoordinator,
+    saveService?: SaveService,
+    shownSaveWarnings?: Set<SaveLifecycleStatus>,
+    responsiveService?: ResponsiveLayoutService,
+    readinessService?: GameReadinessService,
+  ) {
     super({ key: SCENE_KEYS.HOME });
     this.platform = platform;
+    this.progressionController = progressionController;
+    this.sharedMotionPreference = motionPreference;
+    this.sharedSettingsService = settingsService;
+    this.options = options;
+    this.tutorialPreference = tutorialPreference;
+    this.audioCoordinator = audioCoordinator;
+    this.saveService = saveService;
+    this.shownSaveWarnings = shownSaveWarnings;
+    this.responsiveService = responsiveService;
+    this.readinessService = readinessService;
   }
 
   public create(): void {
+    this.activeOverlayMode = 'none';
     this.cameras.main.setBackgroundColor(hexToNumber(Colors.Surface.Background));
+    this.cameras.main.resetFX();
+    this.audioCoordinator?.enterScene(this, 'menu');
+
+    if (this.sharedSettingsService !== undefined) {
+      this.settingsService = this.sharedSettingsService;
+      this.ownsSettingsService = false;
+    } else {
+      this.settingsService = new SettingsService();
+      this.ownsSettingsService = true;
+    }
+
+    if (this.sharedMotionPreference !== undefined) {
+      this.motionPreference = this.sharedMotionPreference;
+      this.ownsMotionPreference = false;
+    } else {
+      this.motionPreference = new MotionPreferenceService(undefined, this.settingsService);
+      this.ownsMotionPreference = true;
+    }
+
+    this.theme = createGameTheme({ reducedMotion: this.motionPreference.isReducedMotion() });
+    this.navigator = new PhaserSceneNavigator(
+      this,
+      () => this.motionPreference?.isReducedMotion() ?? false,
+      this.tutorialPreference,
+    );
+
+    this.controller = new HomeController({
+      progressionController: this.progressionController,
+      navigator: this.navigator,
+      callbacks: {
+        onViewStateChange: (state) => {
+          this.renderViewState(state);
+        },
+      },
+    });
+
+    const initialState = this.controller.getViewState();
+
     this.background = new GameBackground(this, { depth: -10 });
 
-    this.footerText = this.add
+    this.publisherText = this.add
       .text(
         0,
         0,
-        APP_METADATA.studioLabel,
+        HOME_CONFIG.publisherLabel,
         createTextStyle(Typography.LabelSmall, {
           color: Colors.Text.Disabled,
-          align: 'center',
+          scale: 0.86,
         }),
       )
-      .setOrigin(0.5, 1);
+      .setOrigin(0, 0.5);
 
-    this.rebuildView(this.scale.width, this.scale.height);
+    this.settingsButton = new IconButton(this, {
+      icon: 'settings',
+      variant: 'surface',
+      theme: this.theme,
+      onClick: () => {
+        this.audioCoordinator?.playUiClick();
+        this.controller?.openSettings();
+      },
+    });
 
-    this.scale.on(Phaser.Scale.Events.RESIZE, this.handleResize);
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.handleShutdown);
+    this.logo = new GameLogo(this, { theme: this.theme });
 
-    this.platform.notifyGameReady();
-  }
-
-  private rebuildView(width: number, height: number): void {
-    const safeW = Math.max(300, width);
-    const safeH = Math.max(300, height);
-    const isPortrait = safeW < safeH;
-
-    this.background?.resize(safeW, safeH);
-    this.contentContainer?.destroy();
-
-    const virtualW = isPortrait ? 460 : 820;
-    const virtualH = isPortrait ? 700 : 560;
-    const availW = safeW - Dimens.Space32;
-    const availH = safeH - Dimens.Space64;
-    const scale = Math.min(1.1, availW / virtualW, availH / virtualH);
-
-    const container = this.add.container(safeW / 2, safeH / 2 - 12 * scale);
-    container.setScale(scale);
-    this.contentContainer = container;
-
-    const emblem = this.buildEmblem();
-    emblem.setPosition(0, isPortrait ? -246 : -190);
-
-    const titleText = this.add
+    this.taglineText = this.add
       .text(
         0,
-        isPortrait ? -144 : -92,
-        APP_METADATA.title,
-        createTextStyle(Typography.HeadlineLarge, {
-          color: Colors.Text.Primary,
-          align: 'center',
-        }),
-      )
-      .setOrigin(0.5);
-
-    const subtitleText = this.add
-      .text(
         0,
-        isPortrait ? -96 : -44,
-        APP_METADATA.buildLabel,
+        HOME_CONFIG.tagline,
         createTextStyle(Typography.BodyMedium, {
           color: Colors.Text.Secondary,
           align: 'center',
@@ -133,159 +203,446 @@ export class HomeScene extends Phaser.Scene {
       )
       .setOrigin(0.5);
 
-    const selectorCard = this.buildDifficultySelector(isPortrait);
-    selectorCard.setPosition(0, isPortrait ? 78 : 74);
+    this.hero = new HomeHero(this, { theme: this.theme });
 
-    const playButton = new PrimaryButton(this, {
-      x: 0,
-      y: isPortrait ? 268 : 226,
-      width: isPortrait ? 320 : 280,
-      height: Dimens.ButtonHeightLarge,
-      label: 'Play Puzzle',
-      icon: 'play',
-      theme: DefaultGameTheme,
+    this.continueButton = new ContinueButton(this, {
+      label: initialState.primaryActionLabel,
+      supportingText: initialState.primarySupportingText,
+      enabled: initialState.canNavigate,
+      theme: this.theme,
       onClick: () => {
-        this.launchSelectedDifficulty();
+        this.audioCoordinator?.playUiClick();
+        this.controller?.handlePrimaryAction();
       },
     });
 
-    container.add([emblem, titleText, subtitleText, selectorCard, playButton]);
+    this.levelsButton = new OutlineButton(this, {
+      label: HOME_CONFIG.copy.levelsLabel,
+      icon: 'grid',
+      theme: this.theme,
+      onClick: () => {
+        this.audioCoordinator?.playUiClick();
+        this.controller?.openLevels();
+      },
+    });
 
-    if (this.footerText !== undefined) {
-      this.footerText.setPosition(safeW / 2, safeH - Math.max(16, 22 * scale));
-      this.footerText.setScale(Math.max(0.8, Math.min(1, scale)));
+    this.practiceButton = new OutlineButton(this, {
+      label: HOME_CONFIG.copy.practiceLabel,
+      icon: 'moves',
+      theme: this.theme,
+      onClick: () => {
+        this.audioCoordinator?.playUiClick();
+        this.controller?.openPractice();
+      },
+    });
+
+    this.progressCard = new CampaignProgressCard(this, {
+      theme: this.theme,
+      onSelect: () => {
+        this.audioCoordinator?.playUiClick();
+        this.controller?.openLevels();
+      },
+    });
+
+    this.practiceDialog = new PracticeModeDialog(this, {
+      theme: this.theme,
+      onPlayPractice: (difficulty) => {
+        this.audioCoordinator?.playUiClick();
+        this.controller?.launchPracticePuzzle(difficulty);
+      },
+      onClose: () => {
+        this.audioCoordinator?.playUiBack();
+        this.controller?.closeOverlay();
+      },
+    });
+
+    this.settingsOverlay = new SettingsOverlay(this, {
+      settingsService: this.settingsService,
+      motionPreference: this.motionPreference,
+      origin: 'home',
+      vibrationSupported: this.platform.isVibrationSupported?.() ?? false,
+      showHowToPlay: true,
+      theme: this.theme,
+      onHowToPlay: () => {
+        this.controller?.launchTutorialReplay();
+      },
+      onClose: () => {
+        this.controller?.closeOverlay();
+      },
+      onUiClick: () => {
+        this.audioCoordinator?.playUiClick();
+      },
+      onUiBack: () => {
+        this.audioCoordinator?.playUiBack();
+      },
+    });
+
+    this.applyResponsiveLayout(this.scale.width, this.scale.height);
+
+    // Animate progress bar smoothly when returning home with newly completed levels
+    const shouldAnimateProgress =
+      this.lastKnownCompletedCount !== null &&
+      initialState.completedLevelCount > this.lastKnownCompletedCount;
+
+    if (shouldAnimateProgress && this.lastKnownCompletedCount !== null) {
+      this.progressCard.applyViewState(
+        {
+          ...initialState,
+          completedLevelCount: this.lastKnownCompletedCount,
+        },
+        false,
+      );
+      this.progressCard.applyViewState(initialState, true);
+    } else {
+      this.progressCard.applyViewState(initialState, false);
+    }
+    this.lastKnownCompletedCount = initialState.completedLevelCount;
+
+    this.renderViewState(initialState);
+    if (this.saveService !== undefined) {
+      this.saveToastCoordinator = new SaveStatusToastCoordinator(
+        this,
+        this.saveService,
+        this.theme,
+        this.shownSaveWarnings,
+      );
+    }
+    this.playEntranceAnimation();
+    this.hero.startAmbient();
+    this.bindLifecycle();
+
+    if (
+      import.meta.env.DEV &&
+      !this.devInitialDialogConsumed &&
+      this.options.devInitialDialog !== undefined
+    ) {
+      this.devInitialDialogConsumed = true;
+      if (this.options.devInitialDialog === 'practice') {
+        this.controller.openPractice();
+      } else {
+        this.controller.openSettings();
+      }
+    }
+
+    if (this.readinessService !== undefined) {
+      this.readinessService.markInteractiveSceneReady();
+    } else {
+      this.platform.notifyGameReady();
     }
   }
 
-  private buildDifficultySelector(isPortrait: boolean): GameCard {
-    const cols = isPortrait ? 2 : 3;
-    const rows = Math.ceil(ALL_DIFFICULTY_DEFINITIONS.length / cols);
-    const btnW = isPortrait ? 184 : 210;
-    const btnH = 54;
-    const gapX = Dimens.Space12;
-    const gapY = Dimens.Space12;
+  private renderViewState(state: HomeViewState): void {
+    this.continueButton?.setActionText(state.primaryActionLabel, state.primarySupportingText);
+    this.continueButton?.setEnabled(state.canNavigate);
+    this.continueButton?.setFocused(state.focusedControl === 'primary');
 
-    const gridW = cols * btnW + (cols - 1) * gapX;
-    const gridH = rows * btnH + (rows - 1) * gapY;
-    const cardW = gridW + Dimens.Space40;
-    const cardH = gridH + 74;
+    this.levelsButton?.setEnabled(state.canNavigate);
+    this.levelsButton?.setFocused(state.focusedControl === 'levels');
 
-    const card = new GameCard(this, {
-      width: cardW,
-      height: cardH,
-      elevation: 'low',
-      theme: DefaultGameTheme,
-    });
+    this.practiceButton?.setEnabled(state.canNavigate);
+    this.practiceButton?.setFocused(state.focusedControl === 'practice');
 
-    const heading = this.add
-      .text(
-        0,
-        -cardH / 2 + 28,
-        'SELECT DIFFICULTY',
-        createTextStyle(Typography.LabelSmall, {
-          color: Colors.Text.Secondary,
-          align: 'center',
-        }),
-      )
-      .setOrigin(0.5);
-    card.addContent(heading);
+    this.settingsButton?.setEnabled(state.canNavigate);
+    this.settingsButton?.setFocused(state.focusedControl === 'settings');
 
-    const startX = -gridW / 2 + btnW / 2;
-    const startY = -gridH / 2 + btnH / 2 + 16;
+    const progressChanged =
+      this.lastKnownCompletedCount !== null &&
+      state.completedLevelCount !== this.lastKnownCompletedCount;
+    if (progressChanged) {
+      this.progressCard?.applyViewState(state, true);
+      this.lastKnownCompletedCount = state.completedLevelCount;
+    }
 
-    ALL_DIFFICULTY_DEFINITIONS.forEach((def, index) => {
-      const col = index % cols;
-      const row = Math.floor(index / cols);
-      const x = startX + col * (btnW + gapX);
-      const y = startY + row * (btnH + gapY);
-      const label = `${def.displayName} (${String(def.bottleCount)})`;
-      const isSelected = def.id === this.selectedDifficulty;
-
-      const button = isSelected
-        ? new SecondaryButton(this, {
-            x,
-            y,
-            width: btnW,
-            height: btnH,
-            label,
-            theme: DefaultGameTheme,
-            onClick: () => {
-              this.selectDifficulty(def.id);
-            },
-          })
-        : new OutlineButton(this, {
-            x,
-            y,
-            width: btnW,
-            height: btnH,
-            label,
-            theme: DefaultGameTheme,
-            onClick: () => {
-              this.selectDifficulty(def.id);
-            },
-          });
-
-      card.addContent(button);
-    });
-
-    return card;
+    this.syncOverlays(state);
   }
 
-  private selectDifficulty(difficulty: DifficultyId): void {
-    if (this.selectedDifficulty === difficulty) {
+  private syncOverlays(state: HomeViewState): void {
+    if (state.overlayMode === this.activeOverlayMode) {
       return;
     }
-    this.selectedDifficulty = difficulty;
-    this.rebuildView(this.scale.width, this.scale.height);
-  }
 
-  private launchSelectedDifficulty(): void {
-    const sceneData: GameplaySceneData = {
-      difficulty: this.selectedDifficulty,
-    };
-    this.scene.start(SCENE_KEYS.GAME, sceneData);
-  }
+    const previous = this.activeOverlayMode;
+    this.activeOverlayMode = state.overlayMode;
 
-  private buildEmblem(): Phaser.GameObjects.Container {
-    const emblem = this.add.container(0, 0);
-
-    const backdrop = this.add.graphics();
-    backdrop.fillStyle(hexToNumber(Colors.Surface.Surface), 1);
-    backdrop.fillCircle(0, 0, 72);
-    emblem.add(backdrop);
-
-    for (const spec of EMBLEM_BOTTLES) {
-      emblem.add(this.createBottleGraphic(spec));
+    if (previous === 'practice' && this.practiceDialog?.isOpen()) {
+      this.practiceDialog.close();
+    }
+    if (previous === 'settings' && this.settingsOverlay?.isOpen()) {
+      this.settingsOverlay.close();
+    }
+    if (previous === 'error' && this.errorModal?.isOpen()) {
+      this.errorModal.close(false);
     }
 
-    return emblem;
+    if (state.overlayMode === 'practice') {
+      this.practiceDialog?.open();
+    } else if (state.overlayMode === 'settings') {
+      this.settingsOverlay?.open(!this.theme.reducedMotion);
+    } else if (state.overlayMode === 'error') {
+      this.openErrorModal(state.errorMessage ?? 'Something went wrong. Please try again.');
+    }
   }
 
-  private createBottleGraphic(spec: BottleSpec): Phaser.GameObjects.Graphics {
-    const graphics = this.add.graphics({ x: spec.offsetX, y: spec.offsetY });
-    graphics.setAngle(spec.angleDeg);
-    graphics.setScale(0.84);
+  private openErrorModal(message: string): void {
+    this.errorModal?.destroy();
+    this.errorModal = new Modal(this, {
+      title: HOME_CONFIG.copy.errorTitle,
+      message,
+      dismissible: true,
+      theme: this.theme,
+      primaryAction: {
+        label: HOME_CONFIG.copy.cancelLabel,
+        closeOnClick: false,
+        onClick: () => {
+          this.audioCoordinator?.playUiBack();
+          this.controller?.closeOverlay();
+        },
+      },
+      onDismiss: () => {
+        this.audioCoordinator?.playUiBack();
+        this.controller?.closeOverlay();
+      },
+    });
+    this.errorModal.resize(this.scale.width, this.scale.height);
+    this.errorModal.open();
+  }
 
-    graphics.fillStyle(spec.bodyColor, 1);
-    graphics.fillRoundedRect(-20, -14, 40, 74, 10);
-    graphics.fillTriangle(-20, -10, 20, -10, 9, -30);
-    graphics.fillTriangle(-20, -10, -9, -30, 9, -30);
-    graphics.fillRoundedRect(-8, -56, 16, 30, 4);
+  private applyResponsiveLayout(width: number, height: number): void {
+    const safeW = Math.max(1, width);
+    const safeH = Math.max(1, height);
+    const safeArea = this.responsiveService?.getViewport().safeArea;
 
-    graphics.fillStyle(hexToNumber(Colors.Text.Primary), 1);
-    graphics.fillRoundedRect(-9, -68, 18, 13, 3);
+    this.background?.resize(safeW, safeH);
 
-    graphics.fillStyle(spec.labelColor, 0.9);
-    graphics.fillRoundedRect(-12, 6, 24, 30, 4);
+    const layout = calculateHomeLayout({
+      width: safeW,
+      height: safeH,
+      ...(safeArea !== undefined ? { safeArea } : {}),
+    });
 
-    return graphics;
+    this.publisherText?.setPosition(layout.publisher.x, layout.publisher.y);
+    this.publisherText?.setVisible(layout.publisher.visible);
+
+    this.settingsButton?.setPosition(layout.settings.x, layout.settings.y);
+
+    this.logo?.setPosition(layout.logo.x, layout.logo.y);
+    this.logo?.setTargetScale(layout.logo.scale);
+
+    this.taglineText?.setPosition(layout.tagline.x, layout.tagline.y);
+    this.taglineText?.setVisible(layout.tagline.visible);
+    this.taglineText?.setWordWrapWidth(layout.tagline.maxWidth, true);
+
+    this.hero?.applyBounds(layout.hero);
+
+    this.continueButton?.setButtonSize(layout.primaryButton.width, layout.primaryButton.height);
+    this.continueButton?.setPosition(layout.primaryButton.x, layout.primaryButton.y);
+
+    this.levelsButton?.setButtonSize(layout.levelsButton.width, layout.levelsButton.height);
+    this.levelsButton?.setPosition(layout.levelsButton.x, layout.levelsButton.y);
+
+    this.practiceButton?.setButtonSize(layout.practiceButton.width, layout.practiceButton.height);
+    this.practiceButton?.setPosition(layout.practiceButton.x, layout.practiceButton.y);
+
+    this.progressCard?.setCardSize(layout.progressCard.width, layout.progressCard.height);
+    this.progressCard?.setPosition(layout.progressCard.x, layout.progressCard.y);
+
+    this.practiceDialog?.resize(safeW, safeH);
+    this.settingsOverlay?.resize(safeW, safeH, safeArea);
+    this.errorModal?.resize(safeW, safeH, safeArea);
+    this.saveToastCoordinator?.resize(safeW, safeH);
+  }
+
+  /**
+   * Restrained, non-blocking entrance animation. Controls stay immediately interactive
+   * even while decorative elements fade gently into view; skipped cleanly in reduced motion.
+   */
+  private playEntranceAnimation(): void {
+    this.stopEntranceTweens();
+    this.logo?.playEntrance();
+
+    const duration = resolveMotionDuration(MotionDurations.Normal, this.theme.reducedMotion);
+    if (duration === 0) {
+      return;
+    }
+
+    const targets: (Phaser.GameObjects.Container | Phaser.GameObjects.Text | undefined)[] = [
+      this.taglineText,
+      this.hero,
+      this.continueButton,
+      this.levelsButton,
+      this.practiceButton,
+      this.progressCard,
+    ];
+
+    targets.forEach((target, idx) => {
+      if (target === undefined) {
+        return;
+      }
+      target.setAlpha(0);
+      const tween = this.tweens.add({
+        targets: target,
+        alpha: 1,
+        duration,
+        delay: Math.min(220, idx * HOME_CONFIG.motion.staggerDelayMs),
+        ease: MotionEasings.EaseOut,
+      });
+      this.entranceTweens.push(tween);
+    });
+  }
+
+  private stopEntranceTweens(): void {
+    for (const tween of this.entranceTweens) {
+      tween.stop();
+    }
+    this.entranceTweens = [];
+
+    this.taglineText?.setAlpha(1);
+    this.hero?.setAlpha(1);
+    this.continueButton?.setAlpha(1);
+    this.levelsButton?.setAlpha(1);
+    this.practiceButton?.setAlpha(1);
+    this.progressCard?.setAlpha(1);
+  }
+
+  private applyMotionPreference(reducedMotion: boolean): void {
+    this.stopEntranceTweens();
+    this.theme = createGameTheme({ reducedMotion });
+
+    this.logo?.setTheme(this.theme);
+    this.hero?.setTheme(this.theme);
+    this.continueButton?.setTheme(this.theme);
+    this.levelsButton?.setTheme(this.theme);
+    this.practiceButton?.setTheme(this.theme);
+    this.settingsButton?.setTheme(this.theme);
+    this.progressCard?.setTheme(this.theme);
+    this.practiceDialog?.setTheme(this.theme);
+    this.settingsOverlay?.setTheme(this.theme);
+    this.errorModal?.setTheme(this.theme);
+    this.saveToastCoordinator?.setTheme(this.theme);
+  }
+
+  private bindLifecycle(): void {
+    this.scale.on(Phaser.Scale.Events.RESIZE, this.handleResize);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.handleShutdown);
+
+    this.unsubscribePlatformPause = this.platform.onPause(this.handleSuspend);
+    this.unsubscribePlatformResume = this.platform.onResume(this.handleResume);
+    this.unsubscribeMotion = this.motionPreference?.onChange(this.handleMotionChange);
+    this.unsubscribeResponsive = this.responsiveService?.subscribe((snapshot) => {
+      this.applyResponsiveLayout(snapshot.viewport.width, snapshot.viewport.height);
+    });
+
+    if (typeof globalThis.window !== 'undefined') {
+      const useBrowserVisibility =
+        this.platform.getCapabilities?.().useBrowserVisibilityLifecycle ?? true;
+      if (useBrowserVisibility) {
+        globalThis.window.addEventListener('blur', this.handleSuspend);
+        globalThis.window.addEventListener('focus', this.handleResume);
+      }
+      globalThis.window.addEventListener('keydown', this.handleKeyDown);
+    }
   }
 
   private readonly handleResize = (gameSize: Phaser.Structs.Size): void => {
-    this.rebuildView(gameSize.width, gameSize.height);
+    this.applyResponsiveLayout(gameSize.width, gameSize.height);
+  };
+
+  private readonly handleSuspend = (): void => {
+    this.hero?.setSuspended(true);
+    this.controller?.setSuspended(true);
+  };
+
+  private readonly handleResume = (): void => {
+    this.hero?.setSuspended(false);
+    this.controller?.setSuspended(false);
+  };
+
+  private readonly handleMotionChange = (reducedMotion: boolean): void => {
+    this.applyMotionPreference(reducedMotion);
+  };
+
+  private readonly handleKeyDown = (event: KeyboardEvent): void => {
+    if (event.metaKey || event.ctrlKey || event.altKey) {
+      return;
+    }
+
+    switch (event.key) {
+      case 'ArrowRight':
+      case 'ArrowDown':
+        this.controller?.moveFocus(1);
+        break;
+      case 'ArrowLeft':
+      case 'ArrowUp':
+        this.controller?.moveFocus(-1);
+        break;
+      case 'Enter':
+      case ' ':
+        this.controller?.activateFocusedControl();
+        break;
+      case 'Escape':
+        if (this.settingsOverlay?.isOpen() && this.settingsOverlay.hasOpenSubOverlay()) {
+          this.settingsOverlay.handleEscapeKey();
+        } else {
+          this.controller?.handleEscapeKey();
+        }
+        break;
+      default:
+        break;
+    }
   };
 
   private readonly handleShutdown = (): void => {
     this.scale.off(Phaser.Scale.Events.RESIZE, this.handleResize);
+    this.stopEntranceTweens();
+
+    this.unsubscribePlatformPause?.();
+    this.unsubscribePlatformPause = undefined;
+    this.unsubscribePlatformResume?.();
+    this.unsubscribePlatformResume = undefined;
+    this.unsubscribeMotion?.();
+    this.unsubscribeMotion = undefined;
+    this.unsubscribeResponsive?.();
+    this.unsubscribeResponsive = undefined;
+
+    if (this.ownsMotionPreference) {
+      this.motionPreference?.dispose();
+    }
+    this.motionPreference = undefined;
+    if (this.ownsSettingsService) {
+      this.settingsService?.dispose();
+    }
+    this.settingsService = undefined;
+
+    if (typeof globalThis.window !== 'undefined') {
+      globalThis.window.removeEventListener('blur', this.handleSuspend);
+      globalThis.window.removeEventListener('focus', this.handleResume);
+      globalThis.window.removeEventListener('keydown', this.handleKeyDown);
+    }
+
+    this.hero?.stopAmbient();
+    this.background = undefined;
+    this.publisherText = undefined;
+    this.settingsButton = undefined;
+    this.logo = undefined;
+    this.taglineText = undefined;
+    this.hero = undefined;
+    this.continueButton = undefined;
+    this.levelsButton = undefined;
+    this.practiceButton = undefined;
+    this.progressCard = undefined;
+
+    this.controller?.dispose();
+    this.controller = undefined;
+    this.navigator?.cancelPendingTransition();
+    this.navigator = undefined;
+
+    this.practiceDialog?.destroy();
+    this.practiceDialog = undefined;
+    this.settingsOverlay?.destroy();
+    this.settingsOverlay = undefined;
+    this.errorModal?.destroy();
+    this.errorModal = undefined;
+    this.saveToastCoordinator?.dispose();
+    this.saveToastCoordinator = undefined;
   };
 }

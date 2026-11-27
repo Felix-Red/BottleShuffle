@@ -21,6 +21,8 @@ export interface BottleSpriteConfig {
   readonly y?: number;
   readonly width?: number;
   readonly height?: number;
+  readonly hitWidth?: number;
+  readonly hitHeight?: number;
   readonly scale?: number;
   readonly visible?: boolean;
   readonly opacity?: number;
@@ -82,8 +84,8 @@ export class BottleSprite extends Phaser.GameObjects.Container {
 
     this.theme = config.theme ?? DefaultGameTheme;
     this.bottleId = config.bottleId;
-    this.bottleWidth = Math.max(40, config.width ?? 88);
-    this.bottleHeight = Math.max(80, config.height ?? this.bottleWidth * 2);
+    this.bottleWidth = Math.max(16, config.width ?? 88);
+    this.bottleHeight = Math.max(32, config.height ?? this.bottleWidth * 2);
     this.baseOpacity = config.opacity ?? 1;
     this.enabledState = config.enabled ?? true;
     this.selectedState = config.selected ?? false;
@@ -118,13 +120,17 @@ export class BottleSprite extends Phaser.GameObjects.Container {
 
     this.bodyContainer.add([this.selectionIndicator, this.bottleImage]);
 
+    const initialHitW = Math.max(
+      this.bottleWidth,
+      config.hitWidth ?? ensureMinimumTouchTarget(this.bottleWidth),
+    );
+    const initialHitH = Math.max(
+      this.bottleHeight,
+      config.hitHeight ?? ensureMinimumTouchTarget(this.bottleHeight),
+    );
+
     this.hitZone = scene.add
-      .zone(
-        0,
-        -this.bottleHeight / 2,
-        ensureMinimumTouchTarget(this.bottleWidth),
-        ensureMinimumTouchTarget(this.bottleHeight),
-      )
+      .zone(0, -this.bottleHeight / 2, initialHitW, initialHitH)
       .setOrigin(0.5);
 
     this.add([this.shadow, this.bodyContainer, this.hitZone]);
@@ -174,9 +180,14 @@ export class BottleSprite extends Phaser.GameObjects.Container {
     return this;
   }
 
-  public setDisplayDimensions(width: number, height?: number): this {
-    this.bottleWidth = Math.max(40, width);
-    this.bottleHeight = Math.max(80, height ?? this.bottleWidth * 2);
+  public setDisplayDimensions(
+    width: number,
+    height?: number,
+    hitWidth?: number,
+    hitHeight?: number,
+  ): this {
+    this.bottleWidth = Math.max(16, width);
+    this.bottleHeight = Math.max(32, height ?? this.bottleWidth * 2);
 
     this.bottleImage.setDisplaySize(this.bottleWidth, this.bottleHeight);
     this.shadow.setBottleWidth(this.bottleWidth);
@@ -186,8 +197,8 @@ export class BottleSprite extends Phaser.GameObjects.Container {
 
     this.hitZone.setPosition(0, -this.bottleHeight / 2);
     this.hitZone.setSize(
-      ensureMinimumTouchTarget(this.bottleWidth),
-      ensureMinimumTouchTarget(this.bottleHeight),
+      Math.max(this.bottleWidth, hitWidth ?? ensureMinimumTouchTarget(this.bottleWidth)),
+      Math.max(this.bottleHeight, hitHeight ?? ensureMinimumTouchTarget(this.bottleHeight)),
     );
     this.setSize(this.bottleWidth, this.bottleHeight);
     if (!this.swappingState) {

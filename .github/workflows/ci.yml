@@ -1,0 +1,70 @@
+name: Bottle Shuffle QA & CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality-and-build:
+    name: Quality Checks, Coverage & Production Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check code formatting
+        run: npm run format:check
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run TypeScript typecheck
+        run: npm run typecheck
+
+      - name: Run Vitest unit, integration & coverage suite
+        run: npm run test:coverage
+
+      - name: Validate 50-level campaign & solvability
+        run: npm run validate:campaign
+
+      - name: Build & audit YouTube Playables production bundle
+        run: npm run build:youtube
+
+      - name: Validate runtime assets & analyse bundle
+        run: |
+          npm run validate:assets
+          npm run analyse:bundle
+
+      - name: Install Playwright Chromium browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright E2E suite against production preview
+        run: npm run test:e2e
+
+      - name: Upload QA coverage & E2E artefacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-artefacts
+          path: |
+            coverage/coverage-summary.json
+            playwright-report/
+          retention-days: 14

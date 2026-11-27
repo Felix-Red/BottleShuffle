@@ -107,6 +107,23 @@ export class GameplayHUD extends Phaser.GameObjects.Container {
     };
   }
 
+  public getMatchCounterBounds(): {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+  } {
+    const w = this.matchCounter.width * this.matchCounter.scaleX;
+    const h = Math.max(76, this.matchCounter.height * this.matchCounter.scaleY);
+    const pos = this.getMatchCounterPosition();
+    return {
+      x: Math.round(pos.x - w / 2),
+      y: Math.round(pos.y - h / 2),
+      width: Math.round(w),
+      height: Math.round(h),
+    };
+  }
+
   public setMatches(matched: number, total: number, animate = true): this {
     if (matched === this.lastMatchCount && total === this.lastTotalCount) {
       return this;
