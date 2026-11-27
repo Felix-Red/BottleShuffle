@@ -51,12 +51,15 @@ describe('LevelSelectionViewStateMapper', () => {
     expect(newState.totalCampaignLevels).toBe(50);
     expect(newState.canGoPreviousChapter).toBe(false);
     expect(newState.canGoNextChapter).toBe(true);
-    expect(newState.levelCards).toHaveLength(5);
+    expect(newState.levelCards).toHaveLength(8);
     expect(newState.levelCards[0]?.status).toBe('unlocked');
     expect(newState.levelCards[0]?.isRecommended).toBe(true);
+    expect(newState.levelCards[0]?.bottleCount).toBe(3);
+    expect(newState.levelCards[7]?.bottleCount).toBe(10);
     expect(newState.levelCards[1]?.status).toBe('locked');
     expect(newState.levelCards[1]?.prerequisiteLevelNumber).toBe(1);
     expect(newState.previewLevel?.levelId).toBe('level-001');
+    expect(newState.previewLevel?.challengeMode).toBe('classic');
     expect(newState.previewLevel?.isCompleted).toBe(false);
     expect(newState.previewLevel?.bestMoveCount).toBeNull();
     expect(newState.previewLevel?.formattedBestTime).toBeNull();
@@ -67,16 +70,16 @@ describe('LevelSelectionViewStateMapper', () => {
     expect(serialized).not.toContain('minimumSwapDistance');
     expect(serialized).not.toContain('seed');
 
-    // Returning player (7 completed -> Chapter 2, Level 8)
-    completeLevelsUpTo(progression, 7);
+    // Returning player (10 completed -> Chapter 2 Beat the Clock, Level 11)
+    completeLevelsUpTo(progression, 10);
     expect(resolveDefaultChapterId(progression)).toBe('chapter-02');
     const returningState = mapLevelSelectionViewState({
       progressionController: progression,
       selectedChapterId: null,
-      selectedLevelId: 'level-007',
+      selectedLevelId: 'level-010',
       focusedLevelIndex: null,
-      previewLevelId: 'level-007',
-      pendingUnlockLevelIds: new Set(['level-008']),
+      previewLevelId: 'level-010',
+      pendingUnlockLevelIds: new Set(['level-011']),
       canNavigate: true,
       chapterCompletedBanner: null,
       lockedFeedbackMessage: null,
@@ -84,19 +87,22 @@ describe('LevelSelectionViewStateMapper', () => {
     });
 
     expect(returningState.selectedChapterId).toBe('chapter-02');
-    expect(returningState.recommendedLevelId).toBe('level-008');
+    expect(returningState.recommendedLevelId).toBe('level-011');
     expect(returningState.currentChapter.completedLevels).toBe(2);
-    expect(returningState.currentChapter.totalLevels).toBe(5);
+    expect(returningState.currentChapter.totalLevels).toBe(8);
+    expect(returningState.currentChapter.challengeMode).toBe('timed');
     expect(returningState.chapters[0]?.isCompleted).toBe(true);
     expect(returningState.chapters[2]?.isLocked).toBe(true);
     expect(returningState.levelCards[2]?.shouldAnimateUnlock).toBe(true);
     expect(returningState.previewLevel?.isCompleted).toBe(true);
+    expect(returningState.previewLevel?.challengeMode).toBe('timed');
+    expect(returningState.previewLevel?.timeLimitSeconds).toBe(45);
     expect(returningState.previewLevel?.bestMoveCount).toBe(5);
-    expect(returningState.previewLevel?.formattedBestTime).toBe('00:17');
+    expect(returningState.previewLevel?.formattedBestTime).toBe('00:20');
     expect(returningState.previewLevel?.primaryActionLabel).toBe('Replay Level');
 
-    // Check 20 completed -> Chapter 4 Level 21, and 40 completed -> Chapter 6 Level 41
-    completeLevelsUpTo(progression, 20);
+    // Check 24 completed -> Chapter 4 Level 25, and 40 completed -> Chapter 6 Level 41
+    completeLevelsUpTo(progression, 24);
     expect(resolveDefaultChapterId(progression)).toBe('chapter-04');
     completeLevelsUpTo(progression, 40);
     expect(resolveDefaultChapterId(progression)).toBe('chapter-06');

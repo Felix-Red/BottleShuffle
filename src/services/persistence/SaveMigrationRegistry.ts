@@ -1,4 +1,8 @@
-import { CURRENT_SAVE_SCHEMA_VERSION, type SaveErrorCode } from '../../core';
+import {
+  CURRENT_CAMPAIGN_CATALOG_VERSION,
+  CURRENT_SAVE_SCHEMA_VERSION,
+  type SaveErrorCode,
+} from '../../core';
 
 export interface SaveMigrationStep {
   readonly fromVersion: number;
@@ -142,6 +146,32 @@ export class SaveMigrationRegistry {
   }
 }
 
+/**
+ * Pre-release development migration (v1 -> v2):
+ * Because Bottle Shuffle has not yet been publicly released and Catalogue v2.0.0 redesigns
+ * all 50 level definitions (varying bottle counts & challenge modes), v1 development saves
+ * preserve player settings and tutorial completion while explicitly resetting incompatible
+ * campaign progression rather than associating old records with materially different puzzles.
+ */
+export const MIGRATE_V1_TO_V2_CAMPAIGN_REDESIGN: SaveMigrationStep = Object.freeze({
+  fromVersion: 1,
+  toVersion: 2,
+  description:
+    'Migrate pre-release v1 save to v2 redesigned campaign catalogue (preserve settings & tutorial, reset incompatible progression).',
+  migrate(input: Readonly<Record<string, unknown>>): Record<string, unknown> {
+    return {
+      ...input,
+      schemaVersion: 2,
+      campaignCatalogVersion: CURRENT_CAMPAIGN_CATALOG_VERSION,
+      progression: {
+        completedLevels: {},
+        lastPlayedLevelId: null,
+      },
+      seenChallengeIntros: [],
+    };
+  },
+});
+
 export function createDefaultMigrationRegistry(): SaveMigrationRegistry {
-  return new SaveMigrationRegistry();
+  return new SaveMigrationRegistry([MIGRATE_V1_TO_V2_CAMPAIGN_REDESIGN]);
 }

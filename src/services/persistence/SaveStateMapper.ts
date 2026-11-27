@@ -1,4 +1,5 @@
 import {
+  CURRENT_CAMPAIGN_CATALOG_VERSION,
   CURRENT_SAVE_SCHEMA_VERSION,
   freezeSaveData,
   PROGRESSION_SCHEMA_VERSION,
@@ -12,6 +13,7 @@ import {
   type SaveData,
 } from '../../core';
 import type { ProgressionController } from '../../game/progression/ProgressionController';
+import type { ChallengeIntroService } from '../ChallengeIntroService';
 import type { SettingsService } from '../SettingsService';
 import type { TutorialPreferenceService } from '../TutorialPreferenceService';
 
@@ -19,6 +21,7 @@ export interface SaveStateTargets {
   readonly progressionController: ProgressionController;
   readonly settingsService: SettingsService;
   readonly tutorialPreference: TutorialPreferenceService;
+  readonly challengeIntroService?: ChallengeIntroService;
 }
 
 export interface SaveCaptureMetadata {
@@ -59,6 +62,7 @@ export function captureSaveData(
   return freezeSaveData({
     schemaVersion: CURRENT_SAVE_SCHEMA_VERSION,
     gameId: SAVE_GAME_ID,
+    campaignCatalogVersion: CURRENT_CAMPAIGN_CATALOG_VERSION,
     revision: metadata.revision,
     updatedAt: metadata.updatedAt,
     progression: {
@@ -75,6 +79,7 @@ export function captureSaveData(
       status: tutorialStatus,
       completed: tutorialStatus === 'completed',
     },
+    seenChallengeIntros: targets.challengeIntroService?.getSeenModes() ?? [],
   });
 }
 
@@ -131,4 +136,5 @@ export function restoreSaveData(data: SaveData, targets: SaveStateTargets): void
   targets.progressionController.restoreState(restoredProgression);
   targets.settingsService.restoreSettings(restoredSettings);
   targets.tutorialPreference.restoreStatus(data.tutorial.status);
+  targets.challengeIntroService?.restoreSeenModes(data.seenChallengeIntros);
 }

@@ -31,6 +31,12 @@ export function validatePlayingStatus(status: PuzzleStatus): ValidationOutcome {
         reason: 'PUZZLE_ALREADY_COMPLETED',
         message: 'Action cannot be performed after the puzzle has already been completed.',
       };
+    case 'failed':
+      return {
+        valid: false,
+        reason: 'PUZZLE_ALREADY_FAILED',
+        message: 'Action cannot be performed after the attempt has failed.',
+      };
   }
 }
 

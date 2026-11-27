@@ -1,5 +1,5 @@
 export const APP_VERSION = '1.0.0-rc.1';
-export const CAMPAIGN_CATALOG_VERSION = '1.0.0';
+export const CAMPAIGN_CATALOG_VERSION = '2.0.0';
 
 export const APP_METADATA = {
   title: 'BOTTLE SHUFFLE',

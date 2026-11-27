@@ -7,6 +7,7 @@ export type GameAction =
       readonly firstIndex: number;
       readonly secondIndex: number;
     }
+  | { readonly type: 'EXPIRE_TIMER' }
   | { readonly type: 'PAUSE_PUZZLE' }
   | { readonly type: 'RESUME_PUZZLE' }
   | { readonly type: 'RESTART_PUZZLE' };

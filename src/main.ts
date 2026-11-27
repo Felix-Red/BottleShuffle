@@ -29,6 +29,7 @@ import type { GamePlatform, Unsubscribe } from './platform/contracts/GamePlatfor
 import type { SaveStorage } from './platform/contracts/SaveStorage';
 import { createPlatform } from './platform/createPlatform';
 import { InMemorySaveStorage } from './platform/memory/InMemorySaveStorage';
+import { ChallengeIntroService } from './services/ChallengeIntroService';
 import { MotionPreferenceService } from './services/MotionPreferenceService';
 import { ResponsiveLayoutService } from './services/ResponsiveLayoutService';
 import { SettingsService } from './services/SettingsService';
@@ -225,6 +226,7 @@ async function bootstrap(): Promise<void> {
   const progressionController = new ProgressionController();
   const settingsService = new SettingsService();
   const tutorialPreference = new TutorialPreferenceService();
+  const challengeIntroService = new ChallengeIntroService();
   const shownSaveWarnings = new Set<SaveLifecycleStatus>();
   const readinessService = new GameReadinessService(platform);
 
@@ -247,6 +249,7 @@ async function bootstrap(): Promise<void> {
       progressionController,
       settingsService,
       tutorialPreference,
+      challengeIntroService,
     },
   });
 
@@ -307,6 +310,7 @@ async function bootstrap(): Promise<void> {
         progressionController,
         settingsService,
         tutorialPreference,
+        challengeIntroService,
         platform,
       });
 
@@ -365,6 +369,7 @@ async function bootstrap(): Promise<void> {
       responsiveService,
       readinessService,
       adService,
+      challengeIntroService,
     ),
   ];
 
@@ -529,6 +534,7 @@ async function bootstrap(): Promise<void> {
     audioService.dispose();
     hapticService.dispose();
     unlockTracker.dispose();
+    challengeIntroService.dispose();
     tutorialPreference.dispose();
     motionPreference.dispose();
     settingsService.dispose();

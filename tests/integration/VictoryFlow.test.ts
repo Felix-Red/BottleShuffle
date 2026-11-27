@@ -144,7 +144,7 @@ describe('VictoryFlow end-to-end integration journeys', () => {
 
   it('Journey 4: Chapter completion produces chapter star summary and next chapter unlock preview', () => {
     const progression = new ProgressionController(catalog);
-    for (let n = 1; n <= 4; n += 1) {
+    for (let n = 1; n <= 7; n += 1) {
       const id = `level-00${String(n)}`;
       const a = progression.beginCampaignAttempt(id);
       if (a.accepted) {
@@ -160,29 +160,29 @@ describe('VictoryFlow end-to-end integration journeys', () => {
       }
     }
 
-    const level5 = catalog.getLevelById('level-005');
-    expect(level5).toBeDefined();
-    if (level5 === undefined) {
+    const level8 = catalog.getLevelById('level-008');
+    expect(level8).toBeDefined();
+    if (level8 === undefined) {
       return;
     }
-    const puzzle5 = generateLevelPuzzle(level5);
+    const puzzle8 = generateLevelPuzzle(level8);
 
     const gc = new GameplayController({
-      sceneData: { mode: 'campaign', levelId: 'level-005' },
+      sceneData: { mode: 'campaign', levelId: 'level-008' },
       progressionController: progression,
     });
     gc.start();
-    solveGameplayController(gc, puzzle5.targetSequence, 0);
+    solveGameplayController(gc, puzzle8.targetSequence, 0);
 
     const victory = gc.getViewState().victory;
     expect(victory?.chapterCompletion).not.toBeNull();
     expect(victory?.chapterCompletion?.chapterId).toBe('chapter-01');
-    expect(victory?.chapterCompletion?.earnedStars).toBe(15);
-    expect(victory?.chapterCompletion?.maxStars).toBe(15);
+    expect(victory?.chapterCompletion?.earnedStars).toBe(24);
+    expect(victory?.chapterCompletion?.maxStars).toBe(24);
     expect(victory?.chapterCompletion?.nextChapterName).toBe(
       catalog.getChapterById('chapter-02')?.displayName,
     );
-    expect(victory?.unlockedLevel?.levelId).toBe('level-006');
+    expect(victory?.unlockedLevel?.levelId).toBe('level-009');
     gc.dispose();
   });
 

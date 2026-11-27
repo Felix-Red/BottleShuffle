@@ -356,4 +356,38 @@ This document tracks completed milestones, technical notes, and planned upcoming
 
 ## Roadmap Status
 
-All 20 planned engineering tasks (**Tasks 01–20**) are complete. Future work consists of manual owner certification steps and post-launch maintenance (`1.0.0-rc.2` / `1.0.0` / `1.0.1`).
+All 20 planned engineering tasks (**Tasks 01–20**) are complete.
+
+---
+
+## Post-Task-20 — Campaign Progression Redesign (`Catalogue v2.0.0`, `Save Schema v2`)
+
+### Completed
+
+- **Core Challenge Engine (`src/core/`):**
+  - Added `src/core/models/ChallengeMode.ts` defining `'classic' | 'timed' | 'limited_moves' | 'combined'`, `AttemptFailureReason` (`'time_expired' | 'moves_exhausted'`), and `validateChallengeObjective`.
+  - Extended `PuzzleStatus` (`'failed'`), `GameAction` (`'EXPIRE_TIMER'`), `GameEvent` (`'PUZZLE_FAILED'`), `GameError` (`'PUZZLE_ALREADY_FAILED'`, `'MOVE_LIMIT_REACHED'`), `PuzzleState`, `PublicGameState`, `SwapValidator`, `GameStateFactory`, `GameReducer`, and `GameEngine` while keeping `src/core/` 100% pure TypeScript.
+  - Enforced move-limit semantics (selection/deselection free, `movesRemaining >= 0`, winning on the final permitted move succeeds, unsolved 0-move swaps fail) and timer-vs-completion race protection.
+- **Redesigned 50-Level Campaign (`v2.0.0`):**
+  - Added `src/core/levels/CampaignBalanceConfig.ts` (`CAMPAIGN_CATALOG_VERSION = '2.0.0'`, `BOTTLE_COUNT_PUZZLE_DEFAULTS` for `3..10` bottles, and configurable Chapter 2–6 time/move limits).
+  - Rebuilt `DEFAULT_CHAPTER_SPECS` in `src/core/levels/LevelFactory.ts`:
+    - **Ch 1 — First Steps (1–8):** Classic, `3..10` bottles (+1 bottle per level).
+    - **Ch 2 — Beat the Clock (9–16):** Timed, `3..10` bottles (`30, 45, 60, 90, 120, 150, 180, 210`s).
+    - **Ch 3 — Speed Mastery (17–24):** Timed, `3..10` bottles (`20, 30, 45, 60, 90, 120, 150, 180`s).
+    - **Ch 4 — Every Move Counts (25–32):** Limited Moves, `3..10` bottles (`6, 10, 15, 20, 26, 32, 38, 45` moves).
+    - **Ch 5 — Double Trouble (33–40):** Combined, `3..10` bottles (`30s/7m` through `215s/48m`).
+    - **Ch 6 — Shuffle Master (41–50):** Ten unique high-intensity combined challenges (`6..10` bottles).
+- **Persistence `v2` & Migration:**
+  - Bumped `CURRENT_SAVE_SCHEMA_VERSION` to `2`, added `campaignCatalogVersion: '2.0.0'` and `seenChallengeIntros` to `SaveData`, added `ChallengeIntroService`, and registered `MIGRATE_V1_TO_V2_CAMPAIGN_REDESIGN` in `SaveMigrationRegistry.ts`.
+  - Pre-release `v1` saves preserve player `settings` and `tutorial` completion while cleanly resetting incompatible pre-redesign `v1` campaign progression so old records are never silently bound to materially different levels.
+- **Countdown Timer, HUD, Failure & Challenge Intro UI:**
+  - Extended `GameplayClock` with monotonic countdown support, `GameplayLifecycleCoordinator` with `'challenge_intro'` suspension, `GameplayController` with race-free deadline checks and failure handling, `GameplayLayout` with countdown bar geometry, and `GameplayHUD` across all four challenge modes with amber/red urgency feedback respecting Reduced Motion.
+  - Added reusable `FailureOverlay` (`"Time's Up!"` / `"Out of Moves!"`, Retry / Levels / Home, zero lives/energy/mandatory ads) and `ChallengeIntroOverlay` (shown once per mode with countdown paused).
+  - Updated `LevelSelectionViewStateMapper`, `LevelCard`, `LevelGrid`, `ChapterBanner`, and `LevelPreviewDialog` with chapter challenge modes, bottle ranges, and per-level time/move indicators.
+- **Validation, Regression Tests & Documentation:**
+  - Extended `scripts/validate-campaign.mjs` with both mathematical optimal solving and an automated blind hidden-sequence deduction simulator (zero access to `targetSequence`), updated `scripts/calibrate-levels.mjs`, added `tests/unit/campaign/CampaignRedesignRegression.test.ts`, and updated all 10 campaign/engine/UI/persistence/QA docs.
+
+### Trade-Offs & Remaining Limitations
+
+- **Human Playtesting Pending:** Automated mathematical and blind-deduction heuristic simulations confirmed `50/50` solvability, `50/50` unique puzzles, `10/10` unique Chapter 6 configs, and reasonable time budgets (`49/50` `OK` at `3 s/swap`, Level 24 `186s` vs `180s` tight under naive probing), while flagging `13/50` tight heuristic move counts (primarily Chapter 6 mastery). Real human playtesting has **not** yet been conducted; all tuning numbers remain centralised in `src/core/levels/CampaignBalanceConfig.ts` for fast iteration.
+- **Release Package Refresh:** Because `dist/` changed with Catalogue `v2.0.0` / Save Schema `v2`, the existing `1.0.0-rc.1` ZIP archive reflects the pre-redesign build and should be re-packaged (`1.0.0-rc.2`) once human playtesting and tuning are finalised. No release has been published automatically.

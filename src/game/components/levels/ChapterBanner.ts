@@ -108,7 +108,7 @@ export class ChapterBanner extends Phaser.GameObjects.Container {
 
     const statusSuffix = chapter.isLocked ? `  ·  ${LEVEL_SELECTION_COPY.lockedChapterLabel}` : '';
     this.metaText.setText(
-      `${chapter.difficultyDisplayName}  ·  ${String(chapter.bottleCount)} Bottles${statusSuffix}`,
+      `${chapter.challengeModeLabel}  ·  ${chapter.bottleRangeLabel}${statusSuffix}`,
     );
 
     this.layoutContent();

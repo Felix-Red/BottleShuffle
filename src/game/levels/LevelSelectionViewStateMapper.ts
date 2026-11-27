@@ -1,15 +1,18 @@
 import {
+  getChallengeModeDisplayName,
   getDifficultyDefinition,
   MAX_STARS_PER_LEVEL,
+  type ChallengeMode,
   type ChapterId,
+  type LevelDefinition,
   type LevelId,
 } from '../../core';
 import {
+  CHALLENGE_MODE_LEVEL_DESCRIPTIONS,
   LEVEL_SELECTION_COPY,
-  LEVEL_SELECTION_DIFFICULTY_DESCRIPTIONS,
 } from '../../config/ChapterVisualConfig';
 import { formatScoreNumber } from '../../config/VictoryConfig';
-import { formatElapsedTime } from '../../services/GameplayClock';
+import { formatElapsedTime, formatTimeLimitShort } from '../../services/GameplayClock';
 import type { ProgressionController } from '../progression/ProgressionController';
 import type { ChapterViewState } from './ChapterViewState';
 import type { LevelCardViewState } from './LevelCardViewState';
@@ -26,6 +29,43 @@ export interface MapLevelSelectionViewStateInput {
   readonly chapterCompletedBanner: string | null;
   readonly lockedFeedbackMessage: string | null;
   readonly errorMessage: string | null;
+}
+
+function formatBottleRangeLabel(minCount: number, maxCount: number): string {
+  if (minCount === maxCount) {
+    return `${String(minCount)} Bottles`;
+  }
+  return `${String(minCount)}–${String(maxCount)} Bottles`;
+}
+
+function formatLevelCardConstraintSummary(level: LevelDefinition): string {
+  const parts: string[] = [`${String(level.bottleCount)}B`];
+  if (level.timeLimitSeconds !== null) {
+    parts.push(formatTimeLimitShort(level.timeLimitSeconds));
+  }
+  if (level.moveLimit !== null) {
+    parts.push(`${String(level.moveLimit)}m`);
+  }
+  return parts.join(' · ');
+}
+
+function formatPreviewObjectiveSummary(
+  mode: ChallengeMode,
+  timeLimitSeconds: number | null,
+  moveLimit: number | null,
+): string {
+  const modeLabel = getChallengeModeDisplayName(mode);
+  if (mode === 'classic') {
+    return `${modeLabel} · No timer or move limit`;
+  }
+  const restrictions: string[] = [];
+  if (timeLimitSeconds !== null) {
+    restrictions.push(`${formatTimeLimitShort(timeLimitSeconds)} timer`);
+  }
+  if (moveLimit !== null) {
+    restrictions.push(`${String(moveLimit)} moves`);
+  }
+  return `${modeLabel} · ${restrictions.join(' · ')}`;
 }
 
 /**
@@ -93,6 +133,11 @@ export function mapLevelSelectionViewState(
       return Object.freeze({
         levelId: level.id,
         levelNumber: level.levelNumber,
+        bottleCount: level.bottleCount,
+        challengeMode: level.challengeMode,
+        timeLimitSeconds: level.timeLimitSeconds,
+        moveLimit: level.moveLimit,
+        constraintSummary: formatLevelCardConstraintSummary(level),
         status,
         isPlayable,
         isRecommended: recommendedLevelId === level.id,
@@ -117,11 +162,15 @@ export function mapLevelSelectionViewState(
       chapterId: chapter.id,
       chapterNumber: chapter.order,
       displayName: chapter.displayName,
-      description:
-        chapter.description ?? LEVEL_SELECTION_DIFFICULTY_DESCRIPTIONS[chapter.difficulty],
+      description: chapter.description ?? CHALLENGE_MODE_LEVEL_DESCRIPTIONS[chapter.challengeMode],
       difficulty: chapter.difficulty,
       difficultyDisplayName: difficultyDef.displayName,
       bottleCount: chapter.bottleCount,
+      minBottleCount: chapter.minBottleCount,
+      maxBottleCount: chapter.maxBottleCount,
+      bottleRangeLabel: formatBottleRangeLabel(chapter.minBottleCount, chapter.maxBottleCount),
+      challengeMode: chapter.challengeMode,
+      challengeModeLabel: getChallengeModeDisplayName(chapter.challengeMode),
       totalLevels,
       completedLevels,
       earnedStars: chapterStars?.earnedStars ?? 0,
@@ -164,7 +213,20 @@ export function mapLevelSelectionViewState(
           difficulty: levelDef.difficulty,
           difficultyDisplayName: difficultyDef.displayName,
           bottleCount: levelDef.bottleCount,
-          description: LEVEL_SELECTION_DIFFICULTY_DESCRIPTIONS[levelDef.difficulty],
+          challengeMode: levelDef.challengeMode,
+          challengeModeLabel: getChallengeModeDisplayName(levelDef.challengeMode),
+          timeLimitSeconds: levelDef.timeLimitSeconds,
+          formattedTimeLimit:
+            levelDef.timeLimitSeconds !== null
+              ? formatTimeLimitShort(levelDef.timeLimitSeconds)
+              : null,
+          moveLimit: levelDef.moveLimit,
+          objectiveSummary: formatPreviewObjectiveSummary(
+            levelDef.challengeMode,
+            levelDef.timeLimitSeconds,
+            levelDef.moveLimit,
+          ),
+          description: CHALLENGE_MODE_LEVEL_DESCRIPTIONS[levelDef.challengeMode],
           status,
           isCompleted,
           completionCount: record?.completionCount ?? 0,

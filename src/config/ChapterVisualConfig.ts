@@ -1,4 +1,10 @@
-import { CANONICAL_BOTTLE_IDS, type BottleId, type ChapterId, type DifficultyId } from '../core';
+import {
+  CANONICAL_BOTTLE_IDS,
+  type BottleId,
+  type ChallengeMode,
+  type ChapterId,
+  type DifficultyId,
+} from '../core';
 import { Colors } from '../design-system/tokens/Colors';
 
 export interface ChapterVisualTheme {
@@ -86,8 +92,15 @@ export const LEVEL_SELECTION_DIFFICULTY_DESCRIPTIONS: Readonly<Record<Difficulty
   easy: 'Deduce the hidden sequence across 4 colourful bottles.',
   normal: 'Plan deliberate swaps across 5 bottles to maximise matches.',
   intermediate: 'Use structured deduction across 6 distinct bottles.',
-  hard: 'Master an 8-bottle arrangement with deeper swap chains.',
-  expert: 'Take on the full 10-bottle deduction challenge.',
+  hard: 'Master deeper 7–8 bottle arrangements with structured swaps.',
+  expert: 'Take on 9–10 bottle high-complexity deduction challenges.',
+};
+
+export const CHALLENGE_MODE_LEVEL_DESCRIPTIONS: Readonly<Record<ChallengeMode, string>> = {
+  classic: 'Uncover the hidden bottle order at your own pace with no timer or move limit.',
+  timed: 'Deduce and match every bottle before the countdown reaches zero.',
+  limited_moves: 'Solve the hidden bottle order within your maximum swap allowance.',
+  combined: 'Beat both the countdown clock and the move budget to clear this level.',
 };
 
 export const LEVEL_SELECTION_COPY = {

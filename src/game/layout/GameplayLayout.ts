@@ -16,6 +16,7 @@ export interface GameplayLayoutInput {
   readonly width: number;
   readonly height: number;
   readonly bottleCount: number;
+  readonly showCountdownBar?: boolean;
   readonly safeAreaTop?: number;
   readonly safeAreaBottom?: number;
   readonly safeArea?: PartialSafeAreaInsets;
@@ -45,6 +46,13 @@ export interface GameplayHudLayout {
   readonly statHeight: number;
   readonly feedbackX: number;
   readonly feedbackY: number;
+  readonly countdownBar: {
+    readonly visible: boolean;
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+  };
 }
 
 export interface GameplayBoardLayout {
@@ -202,11 +210,23 @@ export function calculateGameplayLayout(input: GameplayLayoutInput): GameplayLay
     const statHeight = isUltraShortLandscape ? 60 : isCompact ? 68 : 78;
     const halfCluster = (matchCounterWidth / 2 + statWidth / 2) * hudScale + clusterGap;
 
+    const showCountdownBar = input.showCountdownBar === true;
+    const countdownBarHeight = isUltraShortLandscape ? 8 : isShortLandscape ? 9 : 11;
+    const countdownBarGap = isShortLandscape ? Dimens.Space4 : Dimens.Space6;
+    const countdownExtraH = showCountdownBar ? countdownBarGap + countdownBarHeight : 0;
+    const countdownBarWidth = Math.min(
+      maxClusterW,
+      Math.round(scaledMatchW + (statWidth * hudScale + clusterGap) * 2),
+    );
+    const countdownBarY = Math.round(
+      hudTopY + hudHeight + countdownBarGap + countdownBarHeight / 2,
+    );
+
     const hud: GameplayHudLayout = {
       orientation: 'landscape',
       scale: hudScale,
       topY: hudTopY,
-      height: hudHeight,
+      height: hudHeight + countdownExtraH,
       matchCounterX: centerX,
       matchCounterY: hudCenterY,
       matchCounterWidth,
@@ -218,13 +238,20 @@ export function calculateGameplayLayout(input: GameplayLayoutInput): GameplayLay
       statHeight,
       feedbackX: centerX,
       feedbackY: Math.round(
-        hudTopY + hudHeight + (isShortLandscape ? Dimens.Space2 : Dimens.Space8),
+        hudTopY + hudHeight + countdownExtraH + (isShortLandscape ? Dimens.Space2 : Dimens.Space8),
       ),
+      countdownBar: {
+        visible: showCountdownBar,
+        x: centerX,
+        y: countdownBarY,
+        width: countdownBarWidth,
+        height: countdownBarHeight,
+      },
     };
 
     const boardTopY =
       hudTopY +
-      hudHeight +
+      hud.height +
       (isUltraShortLandscape
         ? Dimens.Space4
         : isShortLandscape
@@ -340,7 +367,14 @@ export function calculateGameplayLayout(input: GameplayLayoutInput): GameplayLay
       (isUltraShortPortrait ? 8 : isShortPortrait ? 12 : 18) +
       (statHeight * hudScale) / 2,
   );
-  const hudBottomY = Math.round(statsRowY + (statHeight * hudScale) / 2);
+  const showCountdownBar = input.showCountdownBar === true;
+  const countdownBarHeight = isUltraShortPortrait ? 8 : isShortPortrait ? 9 : 11;
+  const countdownBarGap = isShortPortrait ? Dimens.Space6 : Dimens.Space8;
+  const statsBottomY = Math.round(statsRowY + (statHeight * hudScale) / 2);
+  const countdownBarY = Math.round(statsBottomY + countdownBarGap + countdownBarHeight / 2);
+  const hudBottomY = showCountdownBar
+    ? Math.round(countdownBarY + countdownBarHeight / 2)
+    : statsBottomY;
 
   const hud: GameplayHudLayout = {
     orientation: 'portrait',
@@ -358,6 +392,13 @@ export function calculateGameplayLayout(input: GameplayLayoutInput): GameplayLay
     statHeight,
     feedbackX: centerX,
     feedbackY,
+    countdownBar: {
+      visible: showCountdownBar,
+      x: centerX,
+      y: countdownBarY,
+      width: maxScaledRowW,
+      height: countdownBarHeight,
+    },
   };
 
   const boardTopY =

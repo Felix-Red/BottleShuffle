@@ -1,5 +1,6 @@
 import type { ActionRejectionReason } from '../errors/GameError';
 import type { BottleId } from './BottleId';
+import type { AttemptFailureReason } from './ChallengeMode';
 import type { GameActionType } from './GameAction';
 import type { PublicGameState } from './PublicGameState';
 import type { PuzzleState } from './PuzzleState';
@@ -43,6 +44,14 @@ export type GameEvent =
       readonly type: 'PUZZLE_COMPLETED';
       readonly puzzleId: string;
       readonly totalMoves: number;
+      readonly totalBottleCount: number;
+    }
+  | {
+      readonly type: 'PUZZLE_FAILED';
+      readonly puzzleId: string;
+      readonly reason: AttemptFailureReason;
+      readonly totalMoves: number;
+      readonly finalMatchCount: number;
       readonly totalBottleCount: number;
     }
   | {

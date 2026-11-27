@@ -1,30 +1,45 @@
-import type { DifficultyId, SeedProvider } from '../core';
+import type { ChallengeIntroMode, DifficultyId, SeedProvider } from '../core';
 import { MotionDurations } from '../design-system/tokens/Motion';
 
 export const GAMEPLAY_CONFIG = {
   defaultDifficulty: 'normal' as DifficultyId,
   swapTransitionDurationMs: MotionDurations.SwapTotal,
   matchFeedbackDurationMs: MotionDurations.FloatingMatchFeedback,
-  timerPollIntervalMs: 250,
+  timerPollIntervalMs: 100,
+  countdownWarningRatio: 0.35,
+  countdownWarningMs: 15_000,
+  countdownCriticalRatio: 0.15,
+  countdownCriticalMs: 12_000,
+  countdownCriticalFloorMs: 5_000,
+  lowMovesWarningThreshold: 3,
+  lowMovesCriticalThreshold: 1,
 } as const;
 
 export const GAMEPLAY_COPY = {
+  hud: {
+    movesUsedLabel: 'MOVES',
+    movesLeftLabel: 'MOVES LEFT',
+    timeElapsedLabel: 'TIME',
+    timeRemainingLabel: 'TIME LEFT',
+  },
   instructions: {
     noSelection: 'Select two bottles to swap.',
     bottleSelected: 'Select another bottle to swap.',
     swapping: 'Swapping bottles...',
     completed: 'Perfect match!',
+    failedTime: "Time's up! Try again.",
+    failedMoves: 'Out of moves! Try again.',
   },
   pauseModal: {
     title: 'Game paused',
-    message: 'Take a breather. Your puzzle progress and elapsed time are safely held.',
+    message: 'Take a breather. Your puzzle progress and timer are safely held.',
     resumeLabel: 'Resume',
     restartLabel: 'Restart',
     homeLabel: 'Return to Home',
   },
   restartModal: {
     title: 'Restart puzzle?',
-    message: 'Your moves and elapsed time will reset to the starting bottle arrangement.',
+    message: 'Your moves and timer will reset to the starting bottle arrangement.',
     confirmLabel: 'Restart',
     cancelLabel: 'Cancel',
   },
@@ -33,6 +48,48 @@ export const GAMEPLAY_COPY = {
     playAgainLabel: 'Play Again',
     homeLabel: 'Return to Home',
   },
+  failureModal: {
+    timeExpiredTitle: "Time's Up!",
+    movesExhaustedTitle: 'Out of Moves!',
+    timeExpiredHint: 'The countdown reached zero before every bottle matched.',
+    movesExhaustedHint: 'You used every permitted swap before matching all bottles.',
+    retryLabel: 'Retry',
+    levelsLabel: 'Levels',
+    homeLabel: 'Home',
+  },
+  challengeIntros: {
+    timed: {
+      badge: 'NEW CHALLENGE',
+      title: 'Timed Challenge',
+      description:
+        'Match every bottle before the countdown bar runs out. The timer starts as soon as you begin and pauses whenever you pause the game.',
+      ctaLabel: 'Start Level',
+    },
+    limited_moves: {
+      badge: 'NEW CHALLENGE',
+      title: 'Limited Moves',
+      description:
+        'Each bottle swap uses one move — selecting or deselecting bottles is free. Solve the hidden order before your remaining moves reach zero.',
+      ctaLabel: 'Start Level',
+    },
+    combined: {
+      badge: 'NEW CHALLENGE',
+      title: 'Timed + Limited Moves',
+      description:
+        'Race the clock while managing a fixed swap budget. Plan each swap carefully — solve the puzzle before time or moves run out.',
+      ctaLabel: 'Start Level',
+    },
+  } as Readonly<
+    Record<
+      ChallengeIntroMode,
+      {
+        readonly badge: string;
+        readonly title: string;
+        readonly description: string;
+        readonly ctaLabel: string;
+      }
+    >
+  >,
   errorRecovery: {
     title: 'Unable to load puzzle',
     fallbackMessage: 'Something went wrong while preparing this puzzle.',

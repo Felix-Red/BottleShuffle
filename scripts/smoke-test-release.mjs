@@ -44,8 +44,9 @@ function buildSaveFixture(completedCount) {
     };
   }
   return JSON.stringify({
-    schemaVersion: 1,
+    schemaVersion: 2,
     gameId: 'bottle-shuffle',
+    campaignCatalogVersion: '2.0.0',
     revision: 3,
     updatedAt: '2026-11-27T19:00:00.000Z',
     progression: {
@@ -60,6 +61,7 @@ function buildSaveFixture(completedCount) {
       motionPreference: 'system',
     },
     tutorial: { status: 'completed', completed: true },
+    seenChallengeIntros: ['timed', 'limited_moves', 'combined'],
   });
 }
 

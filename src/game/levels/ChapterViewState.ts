@@ -1,4 +1,4 @@
-import type { ChapterId, DifficultyId } from '../../core';
+import type { ChallengeMode, ChapterId, DifficultyId } from '../../core';
 import type { LevelCardViewState } from './LevelCardViewState';
 
 /**
@@ -12,6 +12,11 @@ export interface ChapterViewState {
   readonly difficulty: DifficultyId;
   readonly difficultyDisplayName: string;
   readonly bottleCount: number;
+  readonly minBottleCount: number;
+  readonly maxBottleCount: number;
+  readonly bottleRangeLabel: string;
+  readonly challengeMode: ChallengeMode;
+  readonly challengeModeLabel: string;
   readonly totalLevels: number;
   readonly completedLevels: number;
   readonly earnedStars: number;

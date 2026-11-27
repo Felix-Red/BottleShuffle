@@ -12,6 +12,22 @@ export {
   type BottleId,
 } from './models/BottleId';
 export { createBottle, type Bottle } from './models/Bottle';
+export {
+  CHALLENGE_INTRO_MODES,
+  CHALLENGE_MODES,
+  DEFAULT_CLASSIC_OBJECTIVE,
+  getChallengeModeDisplayName,
+  hasMoveLimit,
+  hasTimeLimit,
+  isChallengeIntroMode,
+  isChallengeMode,
+  resolveChallengeObjective,
+  validateChallengeObjective,
+  type AttemptFailureReason,
+  type ChallengeIntroMode,
+  type ChallengeMode,
+  type LevelChallengeObjective,
+} from './models/ChallengeMode';
 export { DIFFICULTY_IDS, isDifficultyId, type DifficultyId } from './models/Difficulty';
 export type { PuzzleConfig, PuzzleSeedInput, ResolvedPuzzleConfig } from './models/PuzzleConfig';
 export { toPublicPuzzleView, type PublicPuzzleView, type Puzzle } from './models/Puzzle';
@@ -92,9 +108,21 @@ export {
   type ChapterId,
   type LevelId,
 } from './levels/LevelId';
-export type { ChapterDefinition, ChapterSpec } from './levels/ChapterDefinition';
+export type { ChapterDefinition, ChapterSpec, LevelSpec } from './levels/ChapterDefinition';
+export {
+  BOTTLE_COUNT_PUZZLE_DEFAULTS,
+  CAMPAIGN_BALANCE_CONFIG,
+  CAMPAIGN_CATALOG_VERSION,
+  getBottleCountPuzzleDefaults,
+  PROGRESSIVE_BOTTLE_SEQUENCE,
+  type BottleCountPuzzleDefaults,
+  type CombinedLevelTuning,
+  type LimitedMovesLevelTuning,
+  type TimedLevelTuning,
+} from './levels/CampaignBalanceConfig';
 export {
   generateLevelPuzzle,
+  toLevelChallengeObjective,
   toLevelPuzzleConfig,
   type LevelDefinition,
 } from './levels/LevelDefinition';
@@ -233,6 +261,7 @@ export { reduceGameSettings, type SettingsTransitionResult } from './settings/Se
 
 // Persistence domain (Task 15)
 export {
+  CURRENT_CAMPAIGN_CATALOG_VERSION,
   CURRENT_SAVE_SCHEMA_VERSION,
   MIN_SUPPORTED_SAVE_SCHEMA_VERSION,
   SAVE_GAME_ID,

@@ -21,6 +21,7 @@ export function serializeSaveData(data: SaveData): string {
     return JSON.stringify({
       schemaVersion: data.schemaVersion,
       gameId: data.gameId,
+      campaignCatalogVersion: data.campaignCatalogVersion,
       revision: data.revision,
       updatedAt: data.updatedAt,
       progression: {
@@ -37,6 +38,7 @@ export function serializeSaveData(data: SaveData): string {
         status: data.tutorial.status,
         completed: data.tutorial.completed,
       },
+      seenChallengeIntros: data.seenChallengeIntros,
     });
   } catch (error) {
     throw new SaveError('SERIALIZATION_FAILED', 'Unable to serialize save data.', {
@@ -97,12 +99,14 @@ export function computeSaveContentSignature(data: SaveData): string {
   }
 
   return JSON.stringify({
+    campaignCatalogVersion: data.campaignCatalogVersion,
     progression: {
       completedLevels: sortedLevels,
       lastPlayedLevelId: data.progression.lastPlayedLevelId,
     },
     settings: data.settings,
     tutorial: data.tutorial,
+    seenChallengeIntros: [...data.seenChallengeIntros].sort(),
   });
 }
 

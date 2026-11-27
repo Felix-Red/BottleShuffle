@@ -1,4 +1,11 @@
-import type { ChapterId, DifficultyId, EarnedStarRating, LevelId, LevelStatus } from '../../core';
+import type {
+  ChallengeMode,
+  ChapterId,
+  DifficultyId,
+  EarnedStarRating,
+  LevelId,
+  LevelStatus,
+} from '../../core';
 import type { ChapterViewState } from './ChapterViewState';
 import type { LevelCardViewState } from './LevelCardViewState';
 
@@ -11,6 +18,12 @@ export interface LevelPreviewViewState {
   readonly difficulty: DifficultyId;
   readonly difficultyDisplayName: string;
   readonly bottleCount: number;
+  readonly challengeMode: ChallengeMode;
+  readonly challengeModeLabel: string;
+  readonly timeLimitSeconds: number | null;
+  readonly formattedTimeLimit: string | null;
+  readonly moveLimit: number | null;
+  readonly objectiveSummary: string;
   readonly description: string;
   readonly status: Exclude<LevelStatus, 'locked'>;
   readonly isCompleted: boolean;

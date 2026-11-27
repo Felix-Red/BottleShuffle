@@ -136,6 +136,7 @@ export class LevelGrid extends Phaser.GameObjects.Container {
         width: defaultW,
         height: defaultH,
         levelNumber: cardState.levelNumber,
+        metaText: cardState.constraintSummary,
         stars: cardState.bestStarRating ?? 0,
         showStars,
         status: this.mapCardStatus(cardState),
@@ -165,6 +166,7 @@ export class LevelGrid extends Phaser.GameObjects.Container {
       }
       const showStars = cardState.status === 'completed' && cardState.bestStarRating !== null;
       card.setLevelNumber(cardState.levelNumber);
+      card.setMetaText(cardState.constraintSummary);
       card.setAccentColor(this.accentHex);
       card.setLevelState(this.mapCardStatus(cardState), cardState.bestStarRating ?? 0, showStars);
       card.setSelected(cardState.isSelected);

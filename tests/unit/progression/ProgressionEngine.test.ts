@@ -119,9 +119,9 @@ describe('ProgressionEngine', () => {
       expect(rec.level.id).toBe('level-002');
     }
 
-    // Complete Levels 2..5 -> Level 5 unlocks Level 6 and emits CHAPTER_COMPLETED for chapter-01
+    // Complete Levels 2..8 -> Level 8 unlocks Level 9 and emits CHAPTER_COMPLETED for chapter-01
     let lastEvents: readonly { readonly type: string }[] = [];
-    for (let n = 2; n <= 5; n += 1) {
+    for (let n = 2; n <= 8; n += 1) {
       const r = engine.recordCompletion(state, {
         levelId: formatLevelId(n),
         attemptId: `att-${String(n)}`,
@@ -140,7 +140,7 @@ describe('ProgressionEngine', () => {
     ]);
     expect(engine.getChapterProgress(state, 'chapter-01')?.isComplete).toBe(true);
     expect(engine.getChapterProgress(state, 'chapter-01')?.completionPercentage).toBe(100);
-    expect(engine.getLevelStatus(state, 'level-006')).toBe('unlocked');
+    expect(engine.getLevelStatus(state, 'level-009')).toBe('unlocked');
     expect(engine.getChapterProgress(state, 'chapter-02')?.hasPlayableLevel).toBe(true);
   });
 

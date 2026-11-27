@@ -6,6 +6,7 @@ import {
   validateSwapRequest,
 } from '../engine/SwapValidator';
 import type { ActionRejectionReason } from '../errors/GameError';
+import { hasTimeLimit } from '../models/ChallengeMode';
 import type { GameAction, GameActionType } from '../models/GameAction';
 import type { GameEvent, GameTransitionResult } from '../models/GameEvent';
 import { toPublicGameState } from '../models/PublicGameState';
@@ -54,14 +55,28 @@ function executeValidatedSwap(
   state: PuzzleState,
   firstIndex: number,
   secondIndex: number,
+  actionType: GameActionType,
 ): GameTransitionResult {
+  if (state.moveLimit !== null && state.moveCount >= state.moveLimit) {
+    return rejectTransition(
+      state,
+      actionType,
+      'MOVE_LIMIT_REACHED',
+      'No moves remaining for this puzzle attempt.',
+    );
+  }
+
   const nextSequence = swapBottles(state.currentSequence, firstIndex, secondIndex);
   const previousMatchCount = state.currentMatchCount;
   const currentMatchCount = countMatchingPositions(nextSequence, puzzle.targetSequence);
   const matchDelta = currentMatchCount - previousMatchCount;
   const moveCount = state.moveCount + 1;
+  const remainingMoves = state.moveLimit !== null ? Math.max(0, state.moveLimit - moveCount) : null;
   const bestMatchCount = Math.max(state.bestMatchCount, currentMatchCount);
+
+  // Evaluate completion FIRST so a successful final permitted move ALWAYS wins.
   const isCompleted = currentMatchCount === puzzle.bottleCount;
+  const isMovesExhausted = !isCompleted && remainingMoves === 0;
 
   const swapResult: SwapResult = Object.freeze({
     firstIndex,
@@ -78,10 +93,15 @@ function executeValidatedSwap(
     currentSequence: nextSequence,
     selectedSlotIndex: null,
     moveCount,
+    moveLimit: state.moveLimit,
+    remainingMoves,
+    challengeMode: state.challengeMode,
+    timeLimitSeconds: state.timeLimitSeconds,
     currentMatchCount,
     bestMatchCount,
     lastSwap: swapResult,
-    status: isCompleted ? 'completed' : 'playing',
+    status: isCompleted ? 'completed' : isMovesExhausted ? 'failed' : 'playing',
+    failureReason: isMovesExhausted ? 'moves_exhausted' : null,
   });
 
   const events: GameEvent[] = [
@@ -92,13 +112,24 @@ function executeValidatedSwap(
     }),
   ];
 
-  // Deterministic ordering: swap event always precedes completion event
+  // Deterministic ordering: swap event always precedes completion or failure event
   if (isCompleted) {
     events.push(
       Object.freeze({
         type: 'PUZZLE_COMPLETED' as const,
         puzzleId: puzzle.id,
         totalMoves: moveCount,
+        totalBottleCount: puzzle.bottleCount,
+      }),
+    );
+  } else if (isMovesExhausted) {
+    events.push(
+      Object.freeze({
+        type: 'PUZZLE_FAILED' as const,
+        puzzleId: puzzle.id,
+        reason: 'moves_exhausted' as const,
+        totalMoves: moveCount,
+        finalMatchCount: currentMatchCount,
         totalBottleCount: puzzle.bottleCount,
       }),
     );
@@ -109,6 +140,7 @@ function executeValidatedSwap(
 
 /**
  * Pure, authoritative state-transition reducer for a Bottle Shuffle session.
+ * Handles Classic, Timed, Limited Moves, and Combined challenges in a single unified engine.
  * Both tap-to-swap (SELECT_BOTTLE) and direct drag-and-drop (SWAP_BOTTLES) share
  * the exact same swap validation and state-transition logic.
  */
@@ -180,7 +212,13 @@ export function reduceGameState(
         ]);
       }
 
-      return executeValidatedSwap(puzzle, state, state.selectedSlotIndex, action.slotIndex);
+      return executeValidatedSwap(
+        puzzle,
+        state,
+        state.selectedSlotIndex,
+        action.slotIndex,
+        action.type,
+      );
     }
 
     case 'CLEAR_SELECTION': {
@@ -218,7 +256,77 @@ export function reduceGameState(
         return rejectTransition(state, action.type, check.reason, check.message);
       }
 
-      return executeValidatedSwap(puzzle, state, action.firstIndex, action.secondIndex);
+      return executeValidatedSwap(
+        puzzle,
+        state,
+        action.firstIndex,
+        action.secondIndex,
+        action.type,
+      );
+    }
+
+    case 'EXPIRE_TIMER': {
+      if (state.status === 'completed') {
+        return rejectTransition(
+          state,
+          action.type,
+          'PUZZLE_ALREADY_COMPLETED',
+          'Cannot expire timer after puzzle has already been completed.',
+        );
+      }
+      if (state.status === 'failed') {
+        return rejectTransition(
+          state,
+          action.type,
+          'PUZZLE_ALREADY_FAILED',
+          'Cannot expire timer after puzzle has already failed.',
+        );
+      }
+      if (!hasTimeLimit(state.challengeMode) || state.timeLimitSeconds === null) {
+        return rejectTransition(
+          state,
+          action.type,
+          'INVALID_STATE_TRANSITION',
+          'Cannot expire timer on an untimed puzzle.',
+        );
+      }
+      if (state.status !== 'playing') {
+        return rejectTransition(
+          state,
+          action.type,
+          'INVALID_STATE_TRANSITION',
+          `Cannot expire timer from "${state.status}" status; puzzle must be "playing".`,
+        );
+      }
+
+      const events: GameEvent[] = [];
+      if (state.selectedSlotIndex !== null) {
+        events.push(
+          Object.freeze({
+            type: 'SELECTION_CLEARED' as const,
+            previousSlotIndex: state.selectedSlotIndex,
+          }),
+        );
+      }
+      events.push(
+        Object.freeze({
+          type: 'PUZZLE_FAILED' as const,
+          puzzleId: puzzle.id,
+          reason: 'time_expired' as const,
+          totalMoves: state.moveCount,
+          finalMatchCount: state.currentMatchCount,
+          totalBottleCount: puzzle.bottleCount,
+        }),
+      );
+
+      const nextState: PuzzleState = Object.freeze({
+        ...state,
+        selectedSlotIndex: null,
+        status: 'failed',
+        failureReason: 'time_expired',
+      });
+
+      return acceptTransition(nextState, events);
     }
 
     case 'PAUSE_PUZZLE': {
@@ -280,7 +388,11 @@ export function reduceGameState(
     }
 
     case 'RESTART_PUZZLE': {
-      const nextState = createRestartedGameState(puzzle);
+      const nextState = createRestartedGameState(puzzle, {
+        challengeMode: state.challengeMode,
+        moveLimit: state.moveLimit,
+        timeLimitSeconds: state.timeLimitSeconds,
+      });
       return acceptTransition(nextState, [
         Object.freeze({
           type: 'PUZZLE_RESTARTED',

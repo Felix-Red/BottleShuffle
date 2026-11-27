@@ -1,10 +1,18 @@
 import {
   createAttemptResult,
+  DEFAULT_CLASSIC_OBJECTIVE,
   GameEngine,
   generatePuzzle,
+  getChallengeModeDisplayName,
+  isChallengeIntroMode,
+  resolveChallengeObjective,
+  toLevelChallengeObjective,
+  type AttemptFailureReason,
   type AttemptResult,
+  type ChallengeIntroMode,
   type ChapterId,
   type GameEvent,
+  type LevelChallengeObjective,
   type LevelId,
   type PersonalBestComparison,
   type ProgressionEvent,
@@ -17,7 +25,13 @@ import {
   formatMatchDeltaFeedback,
   GAMEPLAY_COPY,
 } from '../../config/GameplayConfig';
-import { GameplayClock, type MonotonicClock } from '../../services/GameplayClock';
+import type { ChallengeIntroService } from '../../services/ChallengeIntroService';
+import {
+  formatElapsedTime,
+  formatTimeLimitShort,
+  GameplayClock,
+  type MonotonicClock,
+} from '../../services/GameplayClock';
 import {
   GameplayLifecycleCoordinator,
   type GameplaySuspensionReason,
@@ -31,10 +45,13 @@ import {
   type GameplaySceneData,
 } from './GameplaySceneData';
 import type {
+  ChallengeIntroViewState,
+  FailureViewState,
   GameplayOverlayMode,
   GameplayViewState,
   MatchFeedbackView,
   PendingSwapTransition,
+  TimerPollUpdate,
 } from './GameplayViewState';
 
 export interface GameplayControllerCallbacks {
@@ -51,6 +68,8 @@ export interface GameplayControllerCallbacks {
 export interface GameplayControllerOptions {
   readonly sceneData?: GameplaySceneData;
   readonly progressionController?: ProgressionController;
+  readonly challengeIntroService?: ChallengeIntroService;
+  readonly challengeObjective?: Partial<LevelChallengeObjective>;
   readonly puzzle?: Puzzle;
   readonly clock?: MonotonicClock;
   readonly lifecycle?: GameplayLifecycleCoordinator;
@@ -58,11 +77,38 @@ export interface GameplayControllerOptions {
   readonly callbacks?: GameplayControllerCallbacks;
 }
 
+function formatChallengeRestrictionSummary(objective: LevelChallengeObjective): string {
+  const parts: string[] = [];
+  if (objective.timeLimitSeconds !== null) {
+    parts.push(`Time Limit: ${formatTimeLimitShort(objective.timeLimitSeconds)}`);
+  }
+  if (objective.moveLimit !== null) {
+    parts.push(`Move Limit: ${String(objective.moveLimit)} Swaps`);
+  }
+  return parts.join('  ·  ');
+}
+
+function buildHeaderSubtitle(
+  chapterName: string | null,
+  bottleCount: number,
+  objective: LevelChallengeObjective,
+): string {
+  const parts: string[] = [];
+  if (chapterName !== null) {
+    parts.push(chapterName);
+  }
+  parts.push(`${String(bottleCount)} Bottles`);
+  if (objective.challengeMode !== 'classic') {
+    parts.push(getChallengeModeDisplayName(objective.challengeMode));
+  }
+  return parts.join(' · ');
+}
+
 /**
  * Presentation-layer controller coordinating GameEngine, GameplayClock,
- * GameplayLifecycleCoordinator, swap transition locking, deterministic scoring,
- * authoritative campaign completion recording, pause/settings/confirmation overlays,
- * and keyboard focus. Contains zero domain rule duplication.
+ * GameplayLifecycleCoordinator, swap transition locking, challenge intros,
+ * countdown expiration, move-limit failure handling, deterministic scoring,
+ * authoritative campaign completion recording, overlays, and keyboard focus.
  */
 export class GameplayController {
   private readonly engine: GameEngine | null;
@@ -70,6 +116,8 @@ export class GameplayController {
   private readonly lifecycle: GameplayLifecycleCoordinator;
   private readonly ownsLifecycle: boolean;
   private readonly progressionController?: ProgressionController;
+  private readonly challengeIntroService?: ChallengeIntroService;
+  private readonly objective: LevelChallengeObjective;
   private readonly mode: GameplayMode;
   private readonly levelId: LevelId | null;
   private readonly levelNumber: number | null;
@@ -93,20 +141,25 @@ export class GameplayController {
   private pendingSwap: PendingSwapTransition | null = null;
   private displayedMatchCount = 0;
   private displayedMoveCount = 0;
+  private displayedRemainingMoves: number | null = null;
   private focusedSlotIndex: number | null = null;
   private matchFeedback: MatchFeedbackView | null = null;
   private feedbackSequence = 0;
   private lastFormattedTime = '00:00';
+  private lastCountdownRatioKey = '';
   private completionCommitted = false;
   private completionModalShown = false;
+  private failureCommitted = false;
+  private failureModalShown = false;
   private latestAttemptResult: AttemptResult | null = null;
   private latestVictoryState: VictoryViewState | null = null;
+  private latestFailureState: FailureViewState | null = null;
+  private activeChallengeIntro: ChallengeIntroViewState | null = null;
   private exitDispatched = false;
   private disposed = false;
 
   public constructor(options: GameplayControllerOptions = {}) {
     this.callbacks = options.callbacks ?? {};
-    this.clock = new GameplayClock(options.clock);
     if (options.lifecycle !== undefined) {
       this.lifecycle = options.lifecycle;
       this.ownsLifecycle = false;
@@ -115,6 +168,7 @@ export class GameplayController {
       this.ownsLifecycle = true;
     }
     this.progressionController = options.progressionController;
+    this.challengeIntroService = options.challengeIntroService;
 
     const launch = resolveGameplayLaunch(options.sceneData);
     let resolvedMode: GameplayMode = launch.mode;
@@ -124,6 +178,9 @@ export class GameplayController {
     let resolvedChapterName: string | null = null;
     let resolvedHeaderTitle = launch.headerTitle;
     let resolvedHeaderSubtitle = launch.headerSubtitle;
+    let resolvedObjective: LevelChallengeObjective = resolveChallengeObjective(
+      options.challengeObjective ?? DEFAULT_CLASSIC_OBJECTIVE,
+    );
 
     let createdEngine: GameEngine | null = null;
 
@@ -144,10 +201,18 @@ export class GameplayController {
           resolvedLevelNumber = beginResult.level.levelNumber;
           resolvedChapterId = beginResult.level.chapterId;
           resolvedChapterName = beginResult.chapterName;
+          resolvedObjective =
+            options.challengeObjective !== undefined
+              ? resolveChallengeObjective(options.challengeObjective)
+              : toLevelChallengeObjective(beginResult.level);
           resolvedHeaderTitle = `Level ${String(beginResult.level.levelNumber)}`;
-          resolvedHeaderSubtitle = `${beginResult.chapterName} · ${String(beginResult.level.bottleCount)} Bottles`;
+          resolvedHeaderSubtitle = buildHeaderSubtitle(
+            beginResult.chapterName,
+            beginResult.level.bottleCount,
+            resolvedObjective,
+          );
           this.campaignAttemptId = beginResult.attempt.attemptId;
-          createdEngine = new GameEngine(options.puzzle ?? beginResult.puzzle);
+          createdEngine = new GameEngine(options.puzzle ?? beginResult.puzzle, resolvedObjective);
         }
       }
     } else {
@@ -158,7 +223,8 @@ export class GameplayController {
           generatePuzzle(launch.puzzleConfig, {
             seedProvider: options.seedProvider ?? createBoundarySeedProvider(),
           });
-        createdEngine = new GameEngine(puzzle);
+        createdEngine = new GameEngine(puzzle, resolvedObjective);
+        resolvedHeaderSubtitle = buildHeaderSubtitle(null, puzzle.bottleCount, resolvedObjective);
       } catch (error) {
         this.errorMessage =
           error instanceof Error ? error.message : GAMEPLAY_COPY.errorRecovery.fallbackMessage;
@@ -166,6 +232,13 @@ export class GameplayController {
       }
     }
 
+    this.objective = resolvedObjective;
+    this.clock = new GameplayClock(
+      options.clock,
+      resolvedObjective.timeLimitSeconds !== null
+        ? resolvedObjective.timeLimitSeconds * 1000
+        : null,
+    );
     this.mode = resolvedMode;
     this.levelId = resolvedLevelId;
     this.levelNumber = resolvedLevelNumber;
@@ -179,8 +252,10 @@ export class GameplayController {
       const pub = this.engine.getPublicState();
       this.displayedMatchCount = pub.currentMatchCount;
       this.displayedMoveCount = pub.moveCount;
+      this.displayedRemainingMoves = pub.remainingMoves;
     }
 
+    this.lastFormattedTime = this.clock.getDisplayTime();
     this.refreshCampaignMeta();
   }
 
@@ -189,16 +264,52 @@ export class GameplayController {
       return this.emitState();
     }
 
+    const introMode = this.resolvePendingChallengeIntroMode();
+    if (introMode !== null) {
+      const copy = GAMEPLAY_COPY.challengeIntros[introMode];
+      const pub = this.engine.getPublicState();
+      this.activeChallengeIntro = Object.freeze({
+        mode: introMode,
+        badge: copy.badge,
+        title: copy.title,
+        description: copy.description,
+        restrictionSummary: formatChallengeRestrictionSummary(this.objective),
+        levelNumber: this.levelNumber,
+        bottleCount: pub.totalBottleCount,
+        ctaLabel: copy.ctaLabel,
+      });
+      this.overlayMode = 'challenge_intro';
+      this.lifecycle.addReason('challenge_intro');
+    }
+
     const result = this.engine.start();
     if (result.accepted) {
       this.displayedMatchCount = result.publicState.currentMatchCount;
       this.displayedMoveCount = result.publicState.moveCount;
+      this.displayedRemainingMoves = result.publicState.remainingMoves;
       this.clock.start();
       this.syncEngineAndClockWithLifecycle();
-      this.lastFormattedTime = this.clock.getFormattedTime();
+      this.lastFormattedTime = this.clock.getDisplayTime();
       this.callbacks.onEvents?.(result.events);
     }
 
+    return this.emitState();
+  }
+
+  public dismissChallengeIntro(): GameplayViewState {
+    if (this.disposed || this.overlayMode !== 'challenge_intro') {
+      return this.getViewState();
+    }
+
+    const mode = this.activeChallengeIntro?.mode;
+    this.activeChallengeIntro = null;
+    this.overlayMode = 'none';
+    if (mode !== undefined) {
+      this.challengeIntroService?.markSeen(mode);
+    }
+    this.lifecycle.removeReason('challenge_intro');
+    this.syncEngineAndClockWithLifecycle();
+    this.lastFormattedTime = this.clock.getDisplayTime();
     return this.emitState();
   }
 
@@ -212,6 +323,14 @@ export class GameplayController {
 
   public getElapsedMs(): number {
     return this.clock.getElapsedMs();
+  }
+
+  public getRemainingMs(): number | null {
+    return this.clock.getRemainingMs();
+  }
+
+  public getChallengeObjective(): LevelChallengeObjective {
+    return this.objective;
   }
 
   public getActiveCampaignAttemptId(): string | null {
@@ -228,6 +347,7 @@ export class GameplayController {
         mode: this.mode,
         levelId: this.levelId,
         levelNumber: this.levelNumber,
+        chapterId: this.chapterId,
         chapterName: this.chapterName,
         nextLevelId: this.nextLevelId,
         nextLevelNumber: this.nextLevelNumber,
@@ -236,6 +356,14 @@ export class GameplayController {
         attemptId: this.attemptId,
         headerTitle: this.headerTitle,
         headerSubtitle: this.headerSubtitle,
+        challengeMode: this.objective.challengeMode,
+        timeLimitSeconds: this.objective.timeLimitSeconds,
+        remainingTimeMs: this.clock.getRemainingMs(),
+        countdownRatio: this.clock.getRemainingRatio(),
+        countdownUrgency: 'normal' as const,
+        moveLimit: this.objective.moveLimit,
+        displayedRemainingMoves: this.objective.moveLimit,
+        remainingMoves: this.objective.moveLimit,
         currentSequence: Object.freeze([]),
         selectedSlotIndex: null,
         focusedSlotIndex: null,
@@ -244,14 +372,17 @@ export class GameplayController {
         totalBottleCount: 0,
         moveCount: 0,
         bestMatchCount: 0,
-        formattedTime: '00:00',
+        formattedTime: this.clock.getDisplayTime(),
         status: 'ready' as const,
+        failureReason: null,
         isSuspended: true,
         inputEnabled: false,
         isSwapping: false,
         instructionText: '',
         matchFeedback: null,
         victory: null,
+        failure: null,
+        challengeIntro: null,
         overlayMode: 'error' as const,
         errorMessage: this.errorMessage,
       });
@@ -266,6 +397,11 @@ export class GameplayController {
     let instructionText: string = GAMEPLAY_COPY.instructions.noSelection;
     if (pub.status === 'completed' && !isSwapping) {
       instructionText = GAMEPLAY_COPY.instructions.completed;
+    } else if (pub.status === 'failed' && !isSwapping) {
+      instructionText =
+        pub.failureReason === 'time_expired'
+          ? GAMEPLAY_COPY.instructions.failedTime
+          : GAMEPLAY_COPY.instructions.failedMoves;
     } else if (isSwapping) {
       instructionText = GAMEPLAY_COPY.instructions.swapping;
     } else if (pub.selectedSlotIndex !== null) {
@@ -276,6 +412,7 @@ export class GameplayController {
       mode: this.mode,
       levelId: this.levelId,
       levelNumber: this.levelNumber,
+      chapterId: this.chapterId,
       chapterName: this.chapterName,
       nextLevelId: this.nextLevelId,
       nextLevelNumber: this.nextLevelNumber,
@@ -284,6 +421,14 @@ export class GameplayController {
       attemptId: this.attemptId,
       headerTitle: this.headerTitle,
       headerSubtitle: this.headerSubtitle,
+      challengeMode: pub.challengeMode,
+      timeLimitSeconds: pub.timeLimitSeconds,
+      remainingTimeMs: this.clock.getRemainingMs(),
+      countdownRatio: this.clock.getRemainingRatio(),
+      countdownUrgency: this.clock.getCountdownUrgency(),
+      moveLimit: pub.moveLimit,
+      displayedRemainingMoves: this.displayedRemainingMoves,
+      remainingMoves: pub.remainingMoves,
       currentSequence: pub.currentSequence,
       selectedSlotIndex: pub.selectedSlotIndex,
       focusedSlotIndex: this.focusedSlotIndex,
@@ -292,14 +437,17 @@ export class GameplayController {
       totalBottleCount: pub.totalBottleCount,
       moveCount: pub.moveCount,
       bestMatchCount: pub.bestMatchCount,
-      formattedTime: this.clock.getFormattedTime(),
+      formattedTime: this.clock.getDisplayTime(),
       status: pub.status,
+      failureReason: pub.failureReason,
       isSuspended,
       inputEnabled,
       isSwapping,
       instructionText,
       matchFeedback: this.matchFeedback,
       victory: this.latestVictoryState,
+      failure: this.latestFailureState,
+      challengeIntro: this.activeChallengeIntro,
       overlayMode: this.overlayMode,
       errorMessage: this.errorMessage,
     });
@@ -312,6 +460,11 @@ export class GameplayController {
 
     if (this.overlayMode !== 'none' || this.pendingSwap !== null || this.lifecycle.isSuspended()) {
       return this.getViewState();
+    }
+
+    // Evaluate deadline BEFORE accepting any tap so late taps past 00:00 fail consistently.
+    if (this.clock.isExpired()) {
+      return this.triggerTimerExpiration();
     }
 
     const result = this.engine.selectBottle(slotIndex);
@@ -328,6 +481,7 @@ export class GameplayController {
     const swapEvent = result.events.find((event) => event.type === 'BOTTLES_SWAPPED');
     if (swapEvent?.type === 'BOTTLES_SWAPPED') {
       const completedAfterSwap = result.events.some((event) => event.type === 'PUZZLE_COMPLETED');
+      const failedAfterSwap = result.events.some((event) => event.type === 'PUZZLE_FAILED');
       const transitionId = this.nextTransitionId;
       this.nextTransitionId += 1;
 
@@ -338,14 +492,28 @@ export class GameplayController {
         secondIndex: swapEvent.swap.secondIndex,
         swap: swapEvent.swap,
         completedAfterSwap,
+        failedAfterSwap,
       };
+
       if (completedAfterSwap) {
-        // Freeze clock and commit authoritative scoring & progression IMMEDIATELY
-        // before animations play so earned completions can never be lost on interruption.
+        // Freeze clock and commit authoritative scoring & progression IMMEDIATELY before
+        // animations play so timer ticks or interruptions can NEVER cancel a winning swap.
         this.lifecycle.markCompleted();
         this.clock.complete();
         this.processCompletedAttemptOnce(result.publicState.moveCount, this.clock.getElapsedMs());
+      } else if (failedAfterSwap) {
+        // Stop countdown immediately on move exhaustion without awarding progression.
+        this.lifecycle.markCompleted();
+        this.clock.complete();
+        this.processFailedAttemptOnce(
+          'moves_exhausted',
+          result.publicState.moveCount,
+          result.publicState.currentMatchCount,
+          result.publicState.totalBottleCount,
+          this.clock.getElapsedMs(),
+        );
       }
+
       const nextState = this.emitState();
       this.callbacks.onSwapStarted?.(this.pendingSwap);
       return nextState;
@@ -369,6 +537,7 @@ export class GameplayController {
     const pub = this.engine.getPublicState();
     this.displayedMatchCount = pub.currentMatchCount;
     this.displayedMoveCount = pub.moveCount;
+    this.displayedRemainingMoves = pub.remainingMoves;
 
     const formatted = formatMatchDeltaFeedback(finished.swap.matchDelta);
     this.feedbackSequence += 1;
@@ -384,6 +553,25 @@ export class GameplayController {
       this.clock.complete();
       this.processCompletedAttemptOnce(pub.moveCount, this.clock.getElapsedMs());
       this.overlayMode = 'completed';
+    } else if (finished.failedAfterSwap === true && !this.failureModalShown) {
+      this.failureModalShown = true;
+      this.lifecycle.markCompleted();
+      this.clock.complete();
+      this.processFailedAttemptOnce(
+        'moves_exhausted',
+        pub.moveCount,
+        pub.currentMatchCount,
+        pub.totalBottleCount,
+        this.clock.getElapsedMs(),
+      );
+      this.overlayMode = 'failed';
+    } else if (
+      !finished.completedAfterSwap &&
+      finished.failedAfterSwap !== true &&
+      this.clock.isExpired()
+    ) {
+      this.callbacks.onSwapCompleted?.(finished);
+      return this.triggerTimerExpiration();
     }
 
     this.callbacks.onSwapCompleted?.(finished);
@@ -493,6 +681,7 @@ export class GameplayController {
 
     if (
       this.overlayMode === 'error' ||
+      this.overlayMode === 'challenge_intro' ||
       this.overlayMode === 'restart_confirm' ||
       this.overlayMode === 'exit_confirm' ||
       this.overlayMode === 'tutorial_confirm'
@@ -500,7 +689,7 @@ export class GameplayController {
       return this.getViewState();
     }
 
-    if (this.overlayMode === 'completed') {
+    if (this.overlayMode === 'completed' || this.overlayMode === 'failed') {
       return this.confirmRestart();
     }
 
@@ -533,8 +722,12 @@ export class GameplayController {
     this.matchFeedback = null;
     this.completionCommitted = false;
     this.completionModalShown = false;
+    this.failureCommitted = false;
+    this.failureModalShown = false;
     this.latestAttemptResult = null;
     this.latestVictoryState = null;
+    this.latestFailureState = null;
+    this.activeChallengeIntro = null;
     this.returnToPauseOnCancel = false;
     this.overlayMode = 'none';
     this.lifecycle.resetForNewAttempt();
@@ -552,9 +745,11 @@ export class GameplayController {
     if (result.accepted) {
       this.displayedMatchCount = result.publicState.currentMatchCount;
       this.displayedMoveCount = result.publicState.moveCount;
+      this.displayedRemainingMoves = result.publicState.remainingMoves;
       this.clock.reset(true);
       this.syncEngineAndClockWithLifecycle();
-      this.lastFormattedTime = this.clock.getFormattedTime();
+      this.lastFormattedTime = this.clock.getDisplayTime();
+      this.lastCountdownRatioKey = '';
       this.callbacks.onEvents?.(result.events);
     }
 
@@ -673,16 +868,59 @@ export class GameplayController {
     return this.removeSuspensionReason('browser_hidden');
   }
 
+  /**
+   * Polls both elapsed/remaining display time and countdown progress bar updates.
+   * Triggers authoritative timer expiration cleanly when the monotonic clock reaches 0.
+   */
+  public pollTimer(): TimerPollUpdate | null {
+    if (this.disposed || this.engine === null) {
+      return null;
+    }
+
+    const pub = this.engine.getPublicState();
+    if (
+      this.clock.isTimed() &&
+      this.clock.isExpired() &&
+      pub.status === 'playing' &&
+      this.pendingSwap === null &&
+      !this.lifecycle.isSuspended() &&
+      this.overlayMode === 'none'
+    ) {
+      this.triggerTimerExpiration();
+      return Object.freeze({
+        formattedTime: this.clock.getDisplayTime(),
+        remainingTimeMs: 0,
+        countdownRatio: 0,
+        countdownUrgency: 'critical' as const,
+        expired: true,
+      });
+    }
+
+    const formatted = this.clock.getDisplayTime();
+    const ratio = this.clock.getRemainingRatio();
+    const urgency = this.clock.getCountdownUrgency();
+    const ratioKey =
+      ratio !== null ? `${formatted}|${ratio.toFixed(3)}|${urgency}` : `${formatted}|classic`;
+
+    if (formatted === this.lastFormattedTime && ratioKey === this.lastCountdownRatioKey) {
+      return null;
+    }
+
+    this.lastFormattedTime = formatted;
+    this.lastCountdownRatioKey = ratioKey;
+
+    return Object.freeze({
+      formattedTime: formatted,
+      remainingTimeMs: this.clock.getRemainingMs(),
+      countdownRatio: ratio,
+      countdownUrgency: urgency,
+      expired: false,
+    });
+  }
+
   public pollFormattedTime(): string | null {
-    if (this.disposed) {
-      return null;
-    }
-    const current = this.clock.getFormattedTime();
-    if (current === this.lastFormattedTime) {
-      return null;
-    }
-    this.lastFormattedTime = current;
-    return current;
+    const update = this.pollTimer();
+    return update !== null ? update.formattedTime : null;
   }
 
   public moveKeyboardFocus(delta: number): GameplayViewState {
@@ -722,6 +960,9 @@ export class GameplayController {
       return this.getViewState();
     }
 
+    if (this.overlayMode === 'challenge_intro') {
+      return this.dismissChallengeIntro();
+    }
     if (this.overlayMode === 'tutorial_confirm') {
       return this.cancelTutorialConfirmation();
     }
@@ -762,6 +1003,102 @@ export class GameplayController {
     }
   }
 
+  private resolvePendingChallengeIntroMode(): ChallengeIntroMode | null {
+    if (this.mode !== 'campaign' || this.challengeIntroService === undefined) {
+      return null;
+    }
+    const mode = this.objective.challengeMode;
+    if (!isChallengeIntroMode(mode)) {
+      return null;
+    }
+    return this.challengeIntroService.shouldShowIntro(mode) ? mode : null;
+  }
+
+  private triggerTimerExpiration(): GameplayViewState {
+    if (
+      this.disposed ||
+      this.engine === null ||
+      this.completionCommitted ||
+      this.failureCommitted
+    ) {
+      return this.getViewState();
+    }
+
+    const res = this.engine.expireTimer();
+    if (!res.accepted) {
+      return this.getViewState();
+    }
+
+    this.lifecycle.markCompleted();
+    this.clock.complete();
+    this.processFailedAttemptOnce(
+      'time_expired',
+      res.publicState.moveCount,
+      res.publicState.currentMatchCount,
+      res.publicState.totalBottleCount,
+      this.clock.getElapsedMs(),
+    );
+    this.failureModalShown = true;
+    this.overlayMode = 'failed';
+    this.lastFormattedTime = this.clock.getDisplayTime();
+    this.callbacks.onEvents?.(res.events);
+    return this.emitState();
+  }
+
+  private processFailedAttemptOnce(
+    reason: AttemptFailureReason,
+    movesUsed: number,
+    finalMatchCount: number,
+    totalBottleCount: number,
+    elapsedMs: number,
+  ): void {
+    if (this.failureCommitted || this.completionCommitted) {
+      return;
+    }
+
+    this.failureCommitted = true;
+
+    // Abandon active campaign attempt so failed attempts NEVER award stars, scores, or unlocks
+    // and NEVER mutate existing completion records.
+    if (this.campaignAttemptId !== null) {
+      this.progressionController?.abandonActiveAttempt(this.campaignAttemptId);
+      this.campaignAttemptId = null;
+    }
+
+    const timeLimitMs = this.clock.getTimeLimitMs();
+    const clampedElapsedMs =
+      timeLimitMs !== null ? Math.min(elapsedMs, timeLimitMs) : Math.max(0, elapsedMs);
+
+    const title =
+      reason === 'time_expired'
+        ? GAMEPLAY_COPY.failureModal.timeExpiredTitle
+        : GAMEPLAY_COPY.failureModal.movesExhaustedTitle;
+    const hint =
+      reason === 'time_expired'
+        ? GAMEPLAY_COPY.failureModal.timeExpiredHint
+        : GAMEPLAY_COPY.failureModal.movesExhaustedHint;
+
+    this.latestFailureState = Object.freeze({
+      reason,
+      title,
+      hint,
+      subtitle: `${this.headerTitle} · ${this.headerSubtitle}`,
+      levelNumber: this.levelNumber,
+      chapterName: this.chapterName,
+      chapterIdForLevels: this.chapterId,
+      challengeMode: this.objective.challengeMode,
+      finalMatchCount,
+      totalBottleCount,
+      movesUsed,
+      moveLimit: this.objective.moveLimit,
+      formattedTimeUsed: formatElapsedTime(clampedElapsedMs),
+      formattedTimeLimit:
+        this.objective.timeLimitSeconds !== null
+          ? formatElapsedTime(this.objective.timeLimitSeconds * 1000)
+          : null,
+    });
+  }
+
   private abandonIncompleteAttempt(): void {
     this.pendingSwap = null;
     this.lifecycle.addReason('scene_inactive');
@@ -782,7 +1119,7 @@ export class GameplayController {
     this.clock.setLifecycleSuspended(suspended);
 
     const status = this.engine.getPublicState().status;
-    if (status === 'completed' || this.lifecycle.isCompleted()) {
+    if (status === 'completed' || status === 'failed' || this.lifecycle.isCompleted()) {
       return;
     }
 
@@ -804,7 +1141,7 @@ export class GameplayController {
    * and builds VictoryViewState exactly once per attempt.
    */
   private processCompletedAttemptOnce(moveCount: number, elapsedMs: number): void {
-    if (this.completionCommitted || this.engine === null) {
+    if (this.completionCommitted || this.failureCommitted || this.engine === null) {
       return;
     }
     const scoringMeta = this.engine.getCompletedScoringMetadata();

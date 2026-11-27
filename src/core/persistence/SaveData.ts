@@ -1,4 +1,5 @@
 import type { LevelId } from '../levels/LevelId';
+import type { ChallengeIntroMode } from '../models/ChallengeMode';
 import type { EarnedStarRating } from '../models/StarRating';
 import type { MotionPreference } from '../settings/MotionPreference';
 import type { SaveMetadata } from './SaveMetadata';
@@ -37,15 +38,18 @@ export interface PersistedTutorialData {
 }
 
 /**
- * Authoritative versioned JSON-serialisable save snapshot for Bottle Shuffle.
- * Contains only minimal player progress, preferences, onboarding state, and metadata.
+ * Authoritative versioned JSON-serialisable save snapshot for Bottle Shuffle (Schema v2).
+ * Records `campaignCatalogVersion` so completion records are never silently mapped onto
+ * materially different campaign levels, and tracks dismissed contextual challenge intros.
  */
 export interface SaveData extends SaveMetadata {
   readonly schemaVersion: typeof CURRENT_SAVE_SCHEMA_VERSION;
   readonly gameId: typeof SAVE_GAME_ID;
+  readonly campaignCatalogVersion: string;
   readonly revision: number;
   readonly updatedAt: string;
   readonly progression: PersistedProgressionData;
   readonly settings: PersistedSettingsData;
   readonly tutorial: PersistedTutorialData;
+  readonly seenChallengeIntros: readonly ChallengeIntroMode[];
 }

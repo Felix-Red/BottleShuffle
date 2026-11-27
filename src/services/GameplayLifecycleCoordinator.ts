@@ -4,6 +4,7 @@ export type GameplaySuspensionReason =
   | 'manual_pause'
   | 'settings_overlay'
   | 'confirmation_dialog'
+  | 'challenge_intro'
   | 'browser_hidden'
   | 'platform_suspended'
   | 'scene_inactive';
@@ -21,6 +22,7 @@ const ATTEMPT_LOCAL_OVERLAY_REASONS: readonly GameplaySuspensionReason[] = [
   'manual_pause',
   'settings_overlay',
   'confirmation_dialog',
+  'challenge_intro',
 ];
 
 /**

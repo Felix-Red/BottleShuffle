@@ -1,9 +1,11 @@
 import Phaser from 'phaser';
+import { hasMoveLimit, hasTimeLimit } from '../../core';
 import { createGameTheme, Dimens, Modal, type GameTheme } from '../../design-system';
 import { GAMEPLAY_CONFIG, GAMEPLAY_COPY } from '../../config/GameplayConfig';
 import { SETTINGS_CONFIG } from '../../config/SettingsConfig';
 import { TUTORIAL_CONFIG } from '../../config/TutorialConfig';
 import type { GamePlatform, Unsubscribe } from '../../platform/contracts/GamePlatform';
+import type { ChallengeIntroService } from '../../services/ChallengeIntroService';
 import { MotionPreferenceService } from '../../services/MotionPreferenceService';
 import type { AdService } from '../../services/advertising/AdService';
 import type { GameReadinessService } from '../../services/platform/GameReadinessService';
@@ -20,6 +22,8 @@ import type { SafeTrajectoryBounds } from '../animations/utils/AnimationCurves';
 import { GameplayAudioController } from '../audio/GameplayAudioController';
 import type { SceneAudioCoordinator } from '../audio/SceneAudioCoordinator';
 import { GameBackground } from '../components/environment/GameBackground';
+import { FailureOverlay } from '../components/failure/FailureOverlay';
+import { ChallengeIntroOverlay } from '../components/gameplay/ChallengeIntroOverlay';
 import { GameplayBoard } from '../components/gameplay/GameplayBoard';
 import { GameplayHeader } from '../components/gameplay/GameplayHeader';
 import { GameplayHUD } from '../components/gameplay/GameplayHUD';
@@ -64,6 +68,7 @@ export class GameScene extends Phaser.Scene {
   private readonly responsiveService?: ResponsiveLayoutService;
   private readonly readinessService?: GameReadinessService;
   private readonly adService?: AdService;
+  private readonly challengeIntroService?: ChallengeIntroService;
   private theme: GameTheme = createGameTheme();
   private policy: AnimationPolicy = resolveAnimationPolicy(false);
   private launchData?: GameplaySceneData;
@@ -99,6 +104,8 @@ export class GameScene extends Phaser.Scene {
   private exitConfirmation?: ExitConfirmation;
   private tutorialConfirmation?: ExitConfirmation;
   private victoryOverlay?: VictoryOverlay;
+  private failureOverlay?: FailureOverlay;
+  private challengeIntroOverlay?: ChallengeIntroOverlay;
   private errorModal?: Modal;
   private saveToastCoordinator?: SaveStatusToastCoordinator;
 
@@ -126,6 +133,7 @@ export class GameScene extends Phaser.Scene {
     responsiveService?: ResponsiveLayoutService,
     readinessService?: GameReadinessService,
     adService?: AdService,
+    challengeIntroService?: ChallengeIntroService,
   ) {
     super({ key: SCENE_KEYS.GAME });
     this.platform = platform;
@@ -141,6 +149,7 @@ export class GameScene extends Phaser.Scene {
     this.responsiveService = responsiveService;
     this.readinessService = readinessService;
     this.adService = adService;
+    this.challengeIntroService = challengeIntroService;
   }
 
   public init(data?: GameplaySceneData): void {
@@ -216,6 +225,9 @@ export class GameScene extends Phaser.Scene {
       ...(this.progressionController !== undefined
         ? { progressionController: this.progressionController }
         : {}),
+      ...(this.challengeIntroService !== undefined
+        ? { challengeIntroService: this.challengeIntroService }
+        : {}),
       callbacks: {
         onViewStateChange: (viewState) => {
           this.renderViewState(viewState);
@@ -261,6 +273,7 @@ export class GameScene extends Phaser.Scene {
       width: this.scale.width,
       height: this.scale.height,
       bottleCount: initialView.totalBottleCount,
+      showCountdownBar: hasTimeLimit(initialView.challengeMode),
     });
 
     this.header = new GameplayHeader(this, {
@@ -283,7 +296,10 @@ export class GameScene extends Phaser.Scene {
       initialMatches: initialView.displayedMatchCount,
       totalBottles: initialView.totalBottleCount,
       initialMoves: initialView.displayedMoveCount,
+      initialRemainingMoves: initialView.displayedRemainingMoves,
       initialTime: initialView.formattedTime,
+      challengeMode: initialView.challengeMode,
+      initialCountdownRatio: initialView.countdownRatio,
       theme: this.theme,
       policy: this.policy,
     });
@@ -589,6 +605,34 @@ export class GameScene extends Phaser.Scene {
         },
       },
     });
+
+    this.failureOverlay = new FailureOverlay(this, {
+      theme: this.theme,
+      onRetry: () => {
+        this.audioCoordinator?.playUiClick();
+        this.failureOverlay?.close();
+        this.coordinator?.resetAttempt();
+        this.hud?.clearFeedback();
+        this.controller?.confirmRestart();
+      },
+      onLevels: () => {
+        this.audioCoordinator?.playUiClick();
+        const chapterId = this.failureOverlay?.getCurrentState()?.chapterIdForLevels ?? undefined;
+        this.returnToLevelSelection(chapterId);
+      },
+      onHome: () => {
+        this.audioCoordinator?.playUiBack();
+        this.returnToHome();
+      },
+    });
+
+    this.challengeIntroOverlay = new ChallengeIntroOverlay(this, {
+      theme: this.theme,
+      onStart: () => {
+        this.audioCoordinator?.playUiClick();
+        this.controller?.dismissChallengeIntro();
+      },
+    });
   }
 
   private buildTutorialOverlays(): void {
@@ -769,8 +813,20 @@ export class GameScene extends Phaser.Scene {
     );
 
     this.hud?.setMatches(viewState.displayedMatchCount, viewState.totalBottleCount, true);
-    this.hud?.setMoveCount(viewState.displayedMoveCount, true);
-    this.hud?.setElapsedTime(viewState.formattedTime);
+    if (hasMoveLimit(viewState.challengeMode)) {
+      this.hud?.setRemainingMoves(viewState.displayedRemainingMoves, true);
+    } else {
+      this.hud?.setMoveCount(viewState.displayedMoveCount, true);
+    }
+    if (hasTimeLimit(viewState.challengeMode)) {
+      this.hud?.setCountdownState(
+        viewState.formattedTime,
+        viewState.countdownRatio,
+        viewState.countdownUrgency,
+      );
+    } else {
+      this.hud?.setElapsedTime(viewState.formattedTime);
+    }
     this.hud?.showMatchFeedback(viewState.matchFeedback);
 
     this.instructions?.setMessage(
@@ -936,6 +992,12 @@ export class GameScene extends Phaser.Scene {
     if (previous === 'completed' && this.victoryOverlay?.isOpen()) {
       this.victoryOverlay.close();
     }
+    if (previous === 'failed' && this.failureOverlay?.isOpen()) {
+      this.failureOverlay.close();
+    }
+    if (previous === 'challenge_intro' && this.challengeIntroOverlay?.isOpen()) {
+      this.challengeIntroOverlay.close();
+    }
 
     const pausePayload = {
       subtitle: `${viewState.headerTitle} · ${viewState.headerSubtitle}`,
@@ -947,7 +1009,11 @@ export class GameScene extends Phaser.Scene {
       },
     };
 
-    if (next === 'pause') {
+    if (next === 'challenge_intro') {
+      if (viewState.challengeIntro !== null) {
+        this.challengeIntroOverlay?.open(viewState.challengeIntro, !this.theme.reducedMotion);
+      }
+    } else if (next === 'pause') {
       if (this.pauseOverlay?.isOpen() === true) {
         this.pauseOverlay.updateStats(pausePayload);
         this.pauseOverlay.setControlsInteractive(true);
@@ -970,6 +1036,10 @@ export class GameScene extends Phaser.Scene {
       this.tutorialConfirmation?.open();
     } else if (next === 'completed') {
       this.triggerCompletionCelebrationAndOverlay(viewState);
+    } else if (next === 'failed') {
+      if (viewState.failure !== null) {
+        this.failureOverlay?.open(viewState.failure, !this.theme.reducedMotion);
+      }
     }
   }
 
@@ -1309,6 +1379,7 @@ export class GameScene extends Phaser.Scene {
           width: safeW,
           height: safeH,
           bottleCount: view.totalBottleCount,
+          showCountdownBar: hasTimeLimit(view.challengeMode),
           ...(safeArea !== undefined ? { safeArea } : {}),
         });
 
@@ -1318,6 +1389,8 @@ export class GameScene extends Phaser.Scene {
         this.instructions?.applyLayout(layout.instructions);
       }
       this.victoryOverlay?.resize(safeW, safeH, safeArea);
+      this.failureOverlay?.resize(safeW, safeH, safeArea);
+      this.challengeIntroOverlay?.resize(safeW, safeH, safeArea);
     }
 
     this.pauseOverlay?.resize(safeW, safeH, safeArea);
@@ -1350,6 +1423,8 @@ export class GameScene extends Phaser.Scene {
     this.exitConfirmation?.setTheme(this.theme);
     this.tutorialConfirmation?.setTheme(this.theme);
     this.victoryOverlay?.setTheme(this.theme);
+    this.failureOverlay?.setTheme(this.theme);
+    this.challengeIntroOverlay?.setTheme(this.theme);
     this.errorModal?.setTheme(this.theme);
     this.saveToastCoordinator?.setTheme(this.theme);
   }
@@ -1390,11 +1465,25 @@ export class GameScene extends Phaser.Scene {
   };
 
   private readonly handleTimerTick = (): void => {
-    const updated = this.isTutorialMode
-      ? this.tutorialController?.pollFormattedTime()
-      : this.controller?.pollFormattedTime();
-    if (updated !== null && updated !== undefined) {
-      this.hud?.setElapsedTime(updated);
+    if (this.isTutorialMode) {
+      const updated = this.tutorialController?.pollFormattedTime();
+      if (updated !== null && updated !== undefined) {
+        this.hud?.setElapsedTime(updated);
+      }
+      return;
+    }
+
+    const update = this.controller?.pollTimer();
+    if (update !== null && update !== undefined) {
+      if (update.countdownRatio !== null) {
+        this.hud?.setCountdownState(
+          update.formattedTime,
+          update.countdownRatio,
+          update.countdownUrgency,
+        );
+      } else {
+        this.hud?.setElapsedTime(update.formattedTime);
+      }
     }
   };
 
@@ -1639,6 +1728,10 @@ export class GameScene extends Phaser.Scene {
     this.tutorialConfirmation = undefined;
     this.victoryOverlay?.destroy();
     this.victoryOverlay = undefined;
+    this.failureOverlay?.destroy();
+    this.failureOverlay = undefined;
+    this.challengeIntroOverlay?.destroy();
+    this.challengeIntroOverlay = undefined;
     this.errorModal?.destroy();
     this.errorModal = undefined;
     this.saveToastCoordinator?.dispose();

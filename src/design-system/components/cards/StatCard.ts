@@ -121,6 +121,11 @@ export class StatCard extends Phaser.GameObjects.Container {
     return this;
   }
 
+  public setValueColor(color: string): this {
+    this.valueText.setColor(color);
+    return this;
+  }
+
   public setAccentColor(accentColor: string): this {
     this.accentColor = accentColor;
     this.layoutAndRedraw();

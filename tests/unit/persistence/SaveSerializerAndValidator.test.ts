@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { PERSISTENCE_CONFIG } from '../../../src/config/PersistenceConfig';
 import {
+  CURRENT_CAMPAIGN_CATALOG_VERSION,
   CURRENT_SAVE_SCHEMA_VERSION,
   getDefaultLevelCatalog,
   isValidSaveData,
@@ -118,6 +119,7 @@ describe('SaveDataValidator', () => {
     const partial = {
       schemaVersion: CURRENT_SAVE_SCHEMA_VERSION,
       gameId: SAVE_GAME_ID,
+      campaignCatalogVersion: CURRENT_CAMPAIGN_CATALOG_VERSION,
       revision: 3,
       updatedAt: '2026-11-27T10:00:00.000Z',
       progression: {

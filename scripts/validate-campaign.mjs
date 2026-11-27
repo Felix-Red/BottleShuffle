@@ -1,13 +1,10 @@
 import { createServer } from 'vite';
 
 /**
- * Test-only optimal swap solver using target index lookup.
+ * Test-only optimal swap solver using target index lookup (validates mathematical solvability).
  * Strictly confined to scripts/ and never bundled into production.
  */
 function solveWithOptimalSwaps(engine, targetSequence) {
-  const targetPos = new Map();
-  targetSequence.forEach((id, idx) => targetPos.set(id, idx));
-
   let swaps = 0;
   let completionEvents = 0;
   const maxSteps = targetSequence.length * 2;
@@ -32,12 +29,14 @@ function solveWithOptimalSwaps(engine, targetSequence) {
 
     const sel = engine.selectBottle(firstMismatch);
     if (!sel.accepted) {
-      throw new Error(`Failed selecting slot ${String(firstMismatch)}: ${sel.reason ?? 'unknown'}`);
+      throw new Error(
+        `Failed selecting slot ${String(firstMismatch)}: ${sel.rejectionReason ?? 'unknown'}`,
+      );
     }
     const swapRes = engine.selectBottle(sourceIdx);
     if (!swapRes.accepted) {
       throw new Error(
-        `Failed swapping ${String(firstMismatch)}<->${String(sourceIdx)}: ${swapRes.reason ?? 'unknown'}`,
+        `Failed swapping ${String(firstMismatch)}<->${String(sourceIdx)}: ${swapRes.rejectionReason ?? 'unknown'}`,
       );
     }
     swaps += 1;
@@ -49,6 +48,196 @@ function solveWithOptimalSwaps(engine, targetSequence) {
   }
 
   return { swaps, completionEvents };
+}
+
+/**
+ * Blind hidden-sequence deduction simulator.
+ * NEVER reads `targetSequence` — interacts ONLY through PublicGameState.currentMatchCount
+ * using systematic human-like exploratory pair probing and match locking.
+ */
+function simulateBlindHumanDeduction(engine) {
+  const n = engine.getPublicState().totalBottleCount;
+  const locked = new Set();
+  const maxSafetySwaps = n * n + 20;
+
+  const doSwap = (a, b) => {
+    const before = engine.getPublicState().currentMatchCount;
+    const res = engine.swapBottles(a, b);
+    if (!res.accepted) {
+      return { accepted: false, delta: 0, status: engine.getPublicState().status };
+    }
+    const after = res.publicState.currentMatchCount;
+    return { accepted: true, delta: after - before, status: res.publicState.status };
+  };
+
+  while (
+    engine.getPublicState().status === 'playing' &&
+    engine.getPublicState().moveCount < maxSafetySwaps
+  ) {
+    const unlocked = [];
+    for (let i = 0; i < n; i += 1) {
+      if (!locked.has(i)) unlocked.push(i);
+    }
+    if (unlocked.length <= 1) break;
+
+    if (unlocked.length === 2) {
+      doSwap(unlocked[0], unlocked[1]);
+      break;
+    }
+
+    const pivot = unlocked[0];
+    let pivotResolved = false;
+
+    for (
+      let idx = 1;
+      idx < unlocked.length && engine.getPublicState().status === 'playing';
+      idx += 1
+    ) {
+      const partner = unlocked[idx];
+      const probe = doSwap(pivot, partner);
+      if (!probe.accepted || probe.status !== 'playing') {
+        pivotResolved = true;
+        break;
+      }
+
+      if (probe.delta === 2) {
+        // Both pivot and partner landed directly in their target slots
+        locked.add(pivot);
+        locked.add(partner);
+        pivotResolved = true;
+        break;
+      }
+
+      if (probe.delta === -2) {
+        // Both pivot and partner were already in their target slots! Undo and lock both.
+        doSwap(pivot, partner);
+        locked.add(pivot);
+        locked.add(partner);
+        pivotResolved = true;
+        break;
+      }
+
+      if (probe.delta === 1) {
+        // Either pivot or partner is now correct. Keep this improvement and probe a 3rd slot to verify pivot if needed.
+        const remainingPartners = unlocked.filter((u) => u !== pivot && u !== partner);
+        if (remainingPartners.length > 0 && engine.getPublicState().status === 'playing') {
+          const third = remainingPartners[0];
+          const verify = doSwap(pivot, third);
+          if (!verify.accepted || verify.status !== 'playing') {
+            pivotResolved = true;
+            break;
+          }
+          if (verify.delta === -1) {
+            // Moving pivot broke its match (and didn't create a new one) -> pivot was right; undo & lock pivot
+            doSwap(pivot, third);
+            locked.add(pivot);
+            pivotResolved = true;
+            break;
+          }
+          if (verify.delta === -2) {
+            // Both pivot and third were right -> undo & lock both
+            doSwap(pivot, third);
+            locked.add(pivot);
+            locked.add(third);
+            pivotResolved = true;
+            break;
+          }
+          if (verify.delta === 2) {
+            locked.add(pivot);
+            locked.add(third);
+            pivotResolved = true;
+            break;
+          }
+          if (verify.delta === 0) {
+            // Undo test swap; partner was the match we gained earlier!
+            doSwap(pivot, third);
+            locked.add(partner);
+            pivotResolved = true;
+            break;
+          }
+          // verify.delta === 1 -> keep gaining matches, restart loop cleanly
+          pivotResolved = true;
+          break;
+        }
+        pivotResolved = true;
+        break;
+      }
+
+      if (probe.delta === -1) {
+        // One of pivot or partner was already correct! Undo the swap first.
+        const undo = doSwap(pivot, partner);
+        if (!undo.accepted || undo.status !== 'playing') {
+          pivotResolved = true;
+          break;
+        }
+        // Check whether pivot was the correct one by testing with a third unlocked slot
+        const third = unlocked.find((u) => u !== pivot && u !== partner);
+        if (third !== undefined && engine.getPublicState().status === 'playing') {
+          const check = doSwap(pivot, third);
+          if (!check.accepted || check.status !== 'playing') {
+            pivotResolved = true;
+            break;
+          }
+          if (check.delta === -1 || check.delta === -2) {
+            doSwap(pivot, third);
+            locked.add(pivot);
+            if (check.delta === -2) locked.add(third);
+            pivotResolved = true;
+            break;
+          }
+          if (check.delta === 2) {
+            locked.add(pivot);
+            locked.add(third);
+            pivotResolved = true;
+            break;
+          }
+          if (check.delta === 0) {
+            // Pivot wasn't matched, so partner MUST have been the matched slot!
+            doSwap(pivot, third);
+            locked.add(partner);
+            pivotResolved = true;
+            break;
+          }
+          // check.delta === 1 -> we improved! restart loop cleanly
+          pivotResolved = true;
+          break;
+        }
+      }
+      if (probe.delta === 0) {
+        // Neither slot matched before or after; undo so we keep exploring cleanly from a known baseline
+        doSwap(pivot, partner);
+      }
+    }
+
+    if (!pivotResolved) {
+      // No partner with unlocked[0] gave a direct hit; perform one deterministic rotation among unlocked slots
+      const rotated = doSwap(unlocked[0], unlocked[unlocked.length - 1]);
+      if (!rotated.accepted || rotated.status !== 'playing') {
+        break;
+      }
+      if (rotated.delta === -2) {
+        doSwap(unlocked[0], unlocked[unlocked.length - 1]);
+        locked.add(unlocked[0]);
+        locked.add(unlocked[unlocked.length - 1]);
+      } else if (rotated.delta === 2) {
+        locked.add(unlocked[0]);
+        locked.add(unlocked[unlocked.length - 1]);
+      } else if (rotated.delta === -1) {
+        doSwap(unlocked[0], unlocked[unlocked.length - 1]);
+        // Rotate last two unlocked slots instead to escape local plateau
+        if (unlocked.length >= 3) {
+          doSwap(unlocked[1], unlocked[2]);
+        }
+      }
+    }
+  }
+
+  const finalPub = engine.getPublicState();
+  return {
+    solved: finalPub.status === 'completed',
+    moves: finalPub.moveCount,
+    status: finalPub.status,
+  };
 }
 
 async function main() {
@@ -83,14 +272,16 @@ async function main() {
     const progression = new progMod.ProgressionController(catalog);
     const seenIds = new Set();
     const seenPuzzles = new Set();
+    const seenConfigSignatures = new Set();
     const chapterCompletions = [];
     let campaignCompletedEvents = 0;
 
     const measureSaveSize = () => {
       const state = progression.getState();
-      const saveData = {
+      const saveData = core.freezeSaveData({
         schemaVersion: core.CURRENT_SAVE_SCHEMA_VERSION,
         gameId: core.SAVE_GAME_ID,
+        campaignCatalogVersion: core.CURRENT_CAMPAIGN_CATALOG_VERSION,
         revision: 1,
         updatedAt: '2026-11-27T18:00:00.000Z',
         progression: {
@@ -99,13 +290,16 @@ async function main() {
         },
         settings: core.createDefaultGameSettings(),
         tutorial: { status: 'completed', completed: true },
-      };
+        seenChallengeIntros: ['timed', 'limited_moves', 'combined'],
+      });
       const serialized = saveMod.serializeSaveData(saveData);
       return saveMod.measureUtf8ByteSize(serialized);
     };
 
     const freshSaveBytes = measureSaveSize();
     let midSaveBytes = 0;
+    const balanceRows = [];
+    let blindFailuresUnderLimit = 0;
 
     for (let i = 0; i < levels.length; i += 1) {
       const level = levels[i];
@@ -121,6 +315,15 @@ async function main() {
       }
       seenIds.add(level.id);
 
+      // Verify Chapter 6 has zero repeated challenge configurations
+      if (level.chapterId === 'chapter-06') {
+        const cfgSig = `${level.challengeMode}:${String(level.bottleCount)}:${String(level.timeLimitSeconds)}:${String(level.moveLimit)}`;
+        if (seenConfigSignatures.has(cfgSig)) {
+          throw new Error(`Duplicate Chapter 6 configuration on ${level.id}: ${cfgSig}`);
+        }
+        seenConfigSignatures.add(cfgSig);
+      }
+
       const viewBefore = progression.getLevelProgressView(level.id);
       if (!viewBefore || viewBefore.status === 'locked') {
         throw new Error(`Level ${level.id} is inaccessible when it should be unlocked`);
@@ -129,7 +332,7 @@ async function main() {
       const puzzle = core.generateLevelPuzzle(level);
       const puzzleValidation = core.validatePuzzle(puzzle, core.toLevelPuzzleConfig(level));
       if (!puzzleValidation.valid) {
-        throw new Error(`Level ${level.id} invalid puzzle: ${puzzleValidation.errors.join('; ')}`);
+        throw new Error(`Level ${level.id} invalid puzzle: ${puzzleValidation.message}`);
       }
 
       const sig = `${puzzle.startingSequence.join(',')}=>${puzzle.targetSequence.join(',')}`;
@@ -139,9 +342,11 @@ async function main() {
       seenPuzzles.add(sig);
 
       const diag = core.inspectPuzzleDiagnostics(puzzle);
-      const engine = new core.GameEngine(puzzle);
-      engine.start();
+      const objective = core.toLevelChallengeObjective(level);
 
+      // 1. Mathematical optimal solvability under the level's exact challenge objective
+      const engine = new core.GameEngine(puzzle, objective);
+      engine.start();
       const { swaps, completionEvents } = solveWithOptimalSwaps(engine, puzzle.targetSequence);
       const finalState = engine.getPublicState();
 
@@ -159,6 +364,38 @@ async function main() {
           `Level ${level.id} optimal solver took ${String(swaps)} swaps vs minSwapDistance=${String(diag.minimumSwapDistance)}`,
         );
       }
+
+      // 2. Blind hidden-sequence deduction simulation (zero access to targetSequence)
+      const blindEngine = new core.GameEngine(puzzle); // unconstrained to measure raw deduction swaps
+      blindEngine.start();
+      const blindResult = simulateBlindHumanDeduction(blindEngine);
+      const withinMoveBudget =
+        level.moveLimit === null
+          ? true
+          : blindResult.solved && blindResult.moves <= level.moveLimit;
+      const estimatedSecondsAt3sPerSwap = Math.round(blindResult.moves * 3.0);
+      const withinTimeBudget =
+        level.timeLimitSeconds === null
+          ? true
+          : estimatedSecondsAt3sPerSwap <= level.timeLimitSeconds;
+
+      if (!withinMoveBudget) {
+        blindFailuresUnderLimit += 1;
+      }
+
+      balanceRows.push({
+        level: level.levelNumber,
+        chapter: level.chapterId,
+        mode: level.challengeMode,
+        bottles: level.bottleCount,
+        minSwaps: diag.minimumSwapDistance,
+        blindSwaps: blindResult.moves,
+        moveLimit: level.moveLimit ?? '-',
+        timeLimit: level.timeLimitSeconds !== null ? `${String(level.timeLimitSeconds)}s` : '-',
+        est3s: `${String(estimatedSecondsAt3sPerSwap)}s`,
+        moveOk: withinMoveBudget ? 'OK' : 'TIGHT',
+        timeOk: withinTimeBudget ? 'OK' : 'TIGHT',
+      });
 
       const beginAttempt = progression.beginCampaignAttempt(level.id);
       if (!beginAttempt.accepted) {
@@ -189,7 +426,9 @@ async function main() {
       });
 
       if (!progResult.accepted) {
-        throw new Error(`Progression rejected ${level.id}: ${progResult.reason ?? 'unknown'}`);
+        throw new Error(
+          `Progression rejected ${level.id}: ${progResult.rejectionReason ?? 'unknown'}`,
+        );
       }
 
       for (const ev of progResult.events) {
@@ -256,19 +495,53 @@ async function main() {
       );
     }
 
-    console.log('=== Bottle Shuffle 50-Level Campaign Validation ===');
-    console.log(`Levels validated & programmatically solved : 50/50`);
+    console.log('=== Bottle Shuffle 50-Level Redesigned Campaign Validation (v2.0.0) ===');
+    console.log('Levels validated & mathematically solved   : 50/50');
     console.log(`Unique puzzle signatures                   : ${String(seenPuzzles.size)}/50`);
+    console.log(
+      `Unique Chapter 6 challenge configs         : ${String(seenConfigSignatures.size)}/10`,
+    );
     console.log(`Chapters completed                         : ${chapterCompletions.join(', ')}`);
     console.log(`Campaign completion events                 : ${String(campaignCompletedEvents)}`);
-    console.log(`Nonexistent level-051 guard                : PASS`);
-    console.log('--- Measured Serialized Save Payload Sizes (UTF-8) ---');
+    console.log(
+      `Blind-deduction heuristic tight move flags : ${String(blindFailuresUnderLimit)}/50`,
+    );
+    console.log('--- Measured Serialized Save Payload Sizes (UTF-8, Schema v2) ---');
     console.log(`Fresh installation (0/50)                  : ${String(freshSaveBytes)} B`);
     console.log(`Mid campaign (25/50)                       : ${String(midSaveBytes)} B`);
     console.log(`Full campaign (50/50)                      : ${String(fullSaveBytes)} B`);
     console.log(
       `Full campaign + replayed bests (50/50)     : ${String(fullWithBestRecordsSaveBytes)} B`,
     );
+
+    if (process.argv.includes('--print-balance')) {
+      console.table(balanceRows);
+    }
+
+    if (process.argv.includes('--print-golden')) {
+      const sampleIds = [
+        'level-001',
+        'level-008',
+        'level-009',
+        'level-017',
+        'level-025',
+        'level-033',
+        'level-041',
+        'level-050',
+      ];
+      const golden = sampleIds.map((id) => {
+        const lvl = catalog.getLevelById(id);
+        const p = core.generateLevelPuzzle(lvl);
+        return {
+          levelId: id,
+          seed: lvl.seed,
+          starting: p.startingSequence,
+          target: p.targetSequence,
+        };
+      });
+      console.log(JSON.stringify(golden, null, 2));
+    }
+
     console.log('Campaign validation PASSED.');
   } finally {
     await server.close();

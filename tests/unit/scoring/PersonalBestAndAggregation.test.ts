@@ -187,6 +187,9 @@ describe('ProgressionEngine scoring, backwards compatibility, and achievement ag
         bottleCount: 10,
         seed: `bonus-${String(levelNumber)}`,
         generatorVersion: PUZZLE_GENERATOR_VERSION,
+        challengeMode: 'classic',
+        timeLimitSeconds: null,
+        moveLimit: null,
         minRequiredSwaps: 5,
         prerequisiteLevelId: formatLevelId(levelNumber - 1),
       });
@@ -198,6 +201,9 @@ describe('ProgressionEngine scoring, backwards compatibility, and achievement ag
       displayName: 'Chapter 7: Master Bonus',
       difficulty: 'expert',
       bottleCount: 10,
+      minBottleCount: 10,
+      maxBottleCount: 10,
+      challengeMode: 'classic',
       levelIds: extraLevels.map((l) => l.id),
     };
 

@@ -292,7 +292,7 @@ describe('LevelSelection & Home mapper star/score integration', () => {
     expect(card2?.bestScore).toBeNull();
     expect(card3?.bestStarRating).toBeNull();
     expect(levelSelectionState.currentChapter.earnedStars).toBe(3);
-    expect(levelSelectionState.currentChapter.maxStars).toBe(15);
+    expect(levelSelectionState.currentChapter.maxStars).toBe(24);
     expect(levelSelectionState.totalEarnedStars).toBe(3);
     expect(levelSelectionState.maxAvailableStars).toBe(150);
     expect(levelSelectionState.previewLevel?.formattedBestScore).toBe('1,000');

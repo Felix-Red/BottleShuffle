@@ -1,5 +1,6 @@
 import { generatePuzzle, PUZZLE_GENERATOR_VERSION } from '../engine/PuzzleGenerator';
 import { ProgressionError } from '../errors/ProgressionError';
+import type { ChallengeMode, LevelChallengeObjective } from '../models/ChallengeMode';
 import type { DifficultyId } from '../models/Difficulty';
 import type { Puzzle } from '../models/Puzzle';
 import type { PuzzleConfig } from '../models/PuzzleConfig';
@@ -8,7 +9,7 @@ import type { ChapterId, LevelId } from './LevelId';
 /**
  * Immutable static definition of a single campaign level.
  * Uses a stable string ID independent of array indices and includes an explicit
- * deterministic seed plus generatorVersion for long-term reproducibility.
+ * deterministic seed, generatorVersion, and configurable challenge objective.
  */
 export interface LevelDefinition {
   readonly id: LevelId;
@@ -18,6 +19,9 @@ export interface LevelDefinition {
   readonly bottleCount: number;
   readonly seed: string;
   readonly generatorVersion: string;
+  readonly challengeMode: ChallengeMode;
+  readonly timeLimitSeconds: number | null;
+  readonly moveLimit: number | null;
   readonly minInitialMatches?: number;
   readonly maxInitialMatches?: number;
   readonly minRequiredSwaps?: number;
@@ -36,6 +40,14 @@ export function toLevelPuzzleConfig(level: LevelDefinition): PuzzleConfig {
       ? { maxInitialMatches: level.maxInitialMatches }
       : {}),
     ...(level.minRequiredSwaps !== undefined ? { minRequiredSwaps: level.minRequiredSwaps } : {}),
+  });
+}
+
+export function toLevelChallengeObjective(level: LevelDefinition): LevelChallengeObjective {
+  return Object.freeze({
+    challengeMode: level.challengeMode,
+    timeLimitSeconds: level.timeLimitSeconds,
+    moveLimit: level.moveLimit,
   });
 }
 

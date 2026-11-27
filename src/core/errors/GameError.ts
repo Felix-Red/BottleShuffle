@@ -4,6 +4,8 @@ export type ActionRejectionReason =
   | 'PUZZLE_NOT_STARTED'
   | 'PUZZLE_PAUSED'
   | 'PUZZLE_ALREADY_COMPLETED'
+  | 'PUZZLE_ALREADY_FAILED'
+  | 'MOVE_LIMIT_REACHED'
   | 'INVALID_STATE_TRANSITION';
 
 export type GameErrorCode =

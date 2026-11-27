@@ -1,4 +1,4 @@
-import type { EarnedStarRating, LevelId, LevelStatus } from '../../core';
+import type { ChallengeMode, EarnedStarRating, LevelId, LevelStatus } from '../../core';
 
 /**
  * Public presentation model for a single campaign level card.
@@ -7,6 +7,11 @@ import type { EarnedStarRating, LevelId, LevelStatus } from '../../core';
 export interface LevelCardViewState {
   readonly levelId: LevelId;
   readonly levelNumber: number;
+  readonly bottleCount: number;
+  readonly challengeMode: ChallengeMode;
+  readonly timeLimitSeconds: number | null;
+  readonly moveLimit: number | null;
+  readonly constraintSummary: string;
   readonly status: LevelStatus;
   readonly isPlayable: boolean;
   readonly isRecommended: boolean;

@@ -9,100 +9,100 @@ import {
 } from '../../../src/core';
 
 /**
- * Golden fixtures across all 6 chapters to guarantee deterministic level generation
- * never silently drifts across code changes.
+ * Golden fixtures across all 6 chapters of Campaign Catalogue v2.0.0 to guarantee
+ * deterministic level generation never silently drifts across code changes.
  */
 const GOLDEN_FIXTURES = [
   {
     levelId: 'level-001',
-    seed: 'level-001-f3d5e8e447e014dd',
-    starting: ['brown', 'silver', 'blue'],
-    target: ['brown', 'blue', 'silver'],
+    seed: 'level-001-1c4caebc8abf56f5',
+    starting: ['pink', 'teal', 'purple'],
+    target: ['pink', 'purple', 'teal'],
   },
   {
-    levelId: 'level-005',
-    seed: 'level-005-254088fdb3a75e7e',
-    starting: ['pink', 'brown', 'orange'],
-    target: ['orange', 'pink', 'brown'],
+    levelId: 'level-008',
+    seed: 'level-008-07f6bc1d88d2a5b6',
+    starting: [
+      'orange',
+      'red',
+      'green',
+      'blue',
+      'pink',
+      'purple',
+      'yellow',
+      'teal',
+      'silver',
+      'brown',
+    ],
+    target: [
+      'brown',
+      'orange',
+      'teal',
+      'pink',
+      'green',
+      'purple',
+      'red',
+      'yellow',
+      'blue',
+      'silver',
+    ],
   },
   {
-    levelId: 'level-006',
-    seed: 'level-006-f2d5e75178d8343a',
-    starting: ['orange', 'blue', 'purple', 'teal'],
-    target: ['purple', 'teal', 'blue', 'orange'],
+    levelId: 'level-009',
+    seed: 'level-009-ea44115303711e84',
+    starting: ['green', 'purple', 'brown'],
+    target: ['green', 'brown', 'purple'],
   },
   {
-    levelId: 'level-011',
-    seed: 'level-011-efd3a401648c52f2',
-    starting: ['silver', 'red', 'teal', 'green', 'blue'],
-    target: ['teal', 'red', 'green', 'blue', 'silver'],
+    levelId: 'level-017',
+    seed: 'level-017-78137bfeab1a7df7',
+    starting: ['purple', 'green', 'pink'],
+    target: ['green', 'pink', 'purple'],
   },
   {
-    levelId: 'level-021',
-    seed: 'level-021-e7d158d26ae540eb',
-    starting: ['red', 'green', 'teal', 'silver', 'blue', 'yellow'],
-    target: ['red', 'silver', 'yellow', 'green', 'blue', 'teal'],
+    levelId: 'level-025',
+    seed: 'level-025-42f56c5071650d01',
+    starting: ['yellow', 'red', 'teal'],
+    target: ['yellow', 'teal', 'red'],
   },
   {
-    levelId: 'level-031',
-    seed: 'level-031-e3cf13ef9db10780',
-    starting: ['blue', 'silver', 'brown', 'red', 'purple', 'teal', 'yellow', 'green'],
-    target: ['purple', 'silver', 'red', 'yellow', 'blue', 'green', 'teal', 'brown'],
+    levelId: 'level-033',
+    seed: 'level-033-fd384724befc6945',
+    starting: ['green', 'teal', 'yellow'],
+    target: ['green', 'yellow', 'teal'],
   },
   {
     levelId: 'level-041',
-    seed: 'level-041-5bcbff402279e539',
-    starting: [
-      'silver',
-      'green',
-      'brown',
-      'blue',
-      'purple',
-      'pink',
-      'orange',
-      'teal',
-      'yellow',
-      'red',
-    ],
-    target: [
-      'green',
-      'brown',
-      'pink',
-      'teal',
-      'red',
-      'yellow',
-      'silver',
-      'purple',
-      'orange',
-      'blue',
-    ],
+    seed: 'level-041-2718de78264821c1',
+    starting: ['silver', 'green', 'orange', 'teal', 'blue', 'brown'],
+    target: ['orange', 'teal', 'brown', 'blue', 'green', 'silver'],
   },
   {
     levelId: 'level-050',
-    seed: 'level-050-76c9eb2abafe31cb',
+    seed: 'level-050-f6cfafce8e6caaef',
     starting: [
-      'brown',
-      'red',
-      'teal',
       'silver',
-      'yellow',
-      'pink',
       'purple',
-      'orange',
-      'blue',
+      'pink',
       'green',
+      'orange',
+      'red',
+      'blue',
+      'teal',
+      'yellow',
+      'brown',
     ],
     target: [
-      'purple',
+      'pink',
+      'red',
+      'silver',
+      'teal',
+      'orange',
+      'brown',
       'blue',
+      'purple',
       'yellow',
       'green',
-      'silver',
-      'orange',
-      'red',
-      'pink',
-      'brown',
-      'teal',
     ],
   },
 ] as const;
@@ -111,7 +111,7 @@ describe('Deterministic 50-Level Generation & Variety', () => {
   it('generates 50 valid, unsolved, unique campaign puzzles with exact deterministic replay', () => {
     const catalog = getDefaultLevelCatalog();
     const seenCompleteSignatures = new Set<string>();
-    const beginnerBottleSets = new Set<string>();
+    const threeBottleSets = new Set<string>();
 
     for (const level of catalog.getAllLevels()) {
       const first = generateLevelPuzzle(level);
@@ -133,14 +133,14 @@ describe('Deterministic 50-Level Generation & Variety', () => {
       expect(seenCompleteSignatures.has(signature)).toBe(false);
       seenCompleteSignatures.add(signature);
 
-      if (level.difficulty === 'beginner') {
-        beginnerBottleSets.add([...first.targetSequence].sort().join(','));
+      if (level.bottleCount === 3) {
+        threeBottleSets.add([...first.targetSequence].sort().join(','));
       }
     }
 
     expect(seenCompleteSignatures.size).toBe(50);
-    // All 5 beginner levels use distinct bottle combinations
-    expect(beginnerBottleSets.size).toBe(5);
+    // All 5 three-bottle chapter opener levels use distinct bottle sets
+    expect(threeBottleSets.size).toBe(5);
   });
 
   it('matches golden deterministic fixtures across all six chapters', () => {

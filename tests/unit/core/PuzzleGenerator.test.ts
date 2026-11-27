@@ -79,10 +79,15 @@ describe('PuzzleGenerator', () => {
       currentSequence: puzzle.startingSequence,
       selectedSlotIndex: null,
       moveCount: 0,
+      moveLimit: null,
+      remainingMoves: null,
+      challengeMode: 'classic',
+      timeLimitSeconds: null,
       currentMatchCount: diag.initialMatchCount,
       bestMatchCount: diag.initialMatchCount,
       lastSwap: null,
       status: 'ready',
+      failureReason: null,
     });
     expect(Object.isFrozen(initialState.currentSequence)).toBe(true);
   });

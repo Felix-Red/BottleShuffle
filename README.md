@@ -2,7 +2,7 @@
 
 Bottle Shuffle is a single-player logic and deduction puzzle game built with Phaser 3 and TypeScript, targeting distribution on **YouTube Playables** as well as desktop and mobile web browsers.
 
-## Game Rules
+## Game Rules & Campaign Progression
 
 - The player is presented with a row of differently coloured bottles arranged in a shuffled sequence.
 - A hidden target sequence exists underneath the visible bottles.
@@ -10,6 +10,13 @@ Bottle Shuffle is a single-player logic and deduction puzzle game built with Pha
 - After every swap, the game reports only the **total number of correctly positioned bottles** (for example `0/10`, `1/10`, `4/10`, `10/10`), never revealing which individual bottles are in the correct slot.
 - The match count may increase, decrease, or stay the same after each swap.
 - The puzzle is solved when every bottle occupies its target position.
+- **Redesigned 50-Level Campaign (`v2.0.0`) across 6 Chapters & 4 Challenge Modes:**
+  1. **Chapter 1 — First Steps (Levels 1–8):** Classic deduction scaling from `3` to `10` bottles (+1 bottle every level).
+  2. **Chapter 2 — Beat the Clock (Levels 9–16):** Timed countdown challenges across `3–10` bottles (`30s`–`210s`).
+  3. **Chapter 3 — Speed Mastery (Levels 17–24):** Tighter timed countdown challenges across `3–10` bottles (`20s`–`180s`).
+  4. **Chapter 4 — Every Move Counts (Levels 25–32):** Move-limited challenges across `3–10` bottles (`6`–`45` moves).
+  5. **Chapter 5 — Double Trouble (Levels 33–40):** Combined timer + move-limit challenges across `3–10` bottles.
+  6. **Chapter 6 — Shuffle Master (Levels 41–50):** Ten unique high-intensity combined challenges (`6–10` bottles).
 
 ## Technology Stack
 

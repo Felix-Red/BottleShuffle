@@ -21,12 +21,54 @@ describe('LevelCatalog & LevelValidator', () => {
     expect(chapters).toHaveLength(6);
 
     const expectedChapters = [
-      { id: 'chapter-01', name: 'First Steps', difficulty: 'beginner', bottles: 3, count: 5 },
-      { id: 'chapter-02', name: 'Getting Warmer', difficulty: 'easy', bottles: 4, count: 5 },
-      { id: 'chapter-03', name: 'The Shuffle', difficulty: 'normal', bottles: 5, count: 10 },
-      { id: 'chapter-04', name: 'Mind Games', difficulty: 'intermediate', bottles: 6, count: 10 },
-      { id: 'chapter-05', name: 'Brain Teaser', difficulty: 'hard', bottles: 8, count: 10 },
-      { id: 'chapter-06', name: 'Mastermind', difficulty: 'expert', bottles: 10, count: 10 },
+      {
+        id: 'chapter-01',
+        name: 'First Steps',
+        mode: 'classic',
+        minBottles: 3,
+        maxBottles: 10,
+        count: 8,
+      },
+      {
+        id: 'chapter-02',
+        name: 'Beat the Clock',
+        mode: 'timed',
+        minBottles: 3,
+        maxBottles: 10,
+        count: 8,
+      },
+      {
+        id: 'chapter-03',
+        name: 'Speed Mastery',
+        mode: 'timed',
+        minBottles: 3,
+        maxBottles: 10,
+        count: 8,
+      },
+      {
+        id: 'chapter-04',
+        name: 'Every Move Counts',
+        mode: 'limited_moves',
+        minBottles: 3,
+        maxBottles: 10,
+        count: 8,
+      },
+      {
+        id: 'chapter-05',
+        name: 'Double Trouble',
+        mode: 'combined',
+        minBottles: 3,
+        maxBottles: 10,
+        count: 8,
+      },
+      {
+        id: 'chapter-06',
+        name: 'Shuffle Master',
+        mode: 'combined',
+        minBottles: 6,
+        maxBottles: 10,
+        count: 10,
+      },
     ] as const;
 
     chapters.forEach((chap, idx) => {
@@ -35,8 +77,9 @@ describe('LevelCatalog & LevelValidator', () => {
       if (exp !== undefined) {
         expect(chap.id).toBe(exp.id);
         expect(chap.displayName).toBe(exp.name);
-        expect(chap.difficulty).toBe(exp.difficulty);
-        expect(chap.bottleCount).toBe(exp.bottles);
+        expect(chap.challengeMode).toBe(exp.mode);
+        expect(chap.minBottleCount).toBe(exp.minBottles);
+        expect(chap.maxBottleCount).toBe(exp.maxBottles);
         expect(catalog.getLevelsByChapter(chap.id)).toHaveLength(exp.count);
       }
     });
@@ -54,7 +97,7 @@ describe('LevelCatalog & LevelValidator', () => {
     expect(catalog.getPreviousLevel('level-050')?.id).toBe('level-049');
     expect(catalog.getNextLevel('level-050')).toBeUndefined();
     expect(catalog.getLevelByNumber(25)?.id).toBe('level-025');
-    expect(catalog.getChapterForLevel('level-041')?.displayName).toBe('Mastermind');
+    expect(catalog.getChapterForLevel('level-041')?.displayName).toBe('Shuffle Master');
   });
 
   it('supports appending new chapters/levels without altering existing level IDs or seeds', () => {

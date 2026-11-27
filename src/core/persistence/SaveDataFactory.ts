@@ -1,3 +1,4 @@
+import { isChallengeIntroMode, type ChallengeIntroMode } from '../models/ChallengeMode';
 import { createDefaultGameSettings } from '../settings/SettingsDefaults';
 import type {
   PersistedLevelRecord,
@@ -6,11 +7,35 @@ import type {
   PersistedTutorialData,
   SaveData,
 } from './SaveData';
-import { CURRENT_SAVE_SCHEMA_VERSION, SAVE_GAME_ID } from './SaveSchemaVersion';
+import {
+  CURRENT_CAMPAIGN_CATALOG_VERSION,
+  CURRENT_SAVE_SCHEMA_VERSION,
+  SAVE_GAME_ID,
+} from './SaveSchemaVersion';
 
 export const DEFAULT_SAVE_TIMESTAMP = '1970-01-01T00:00:00.000Z';
 
-export function freezeSaveData(data: SaveData): SaveData {
+function normalizeSeenChallengeIntros(
+  modes: readonly ChallengeIntroMode[] | undefined,
+): readonly ChallengeIntroMode[] {
+  if (modes === undefined || modes.length === 0) {
+    return Object.freeze([]);
+  }
+  const unique: ChallengeIntroMode[] = [];
+  for (const mode of modes) {
+    if (isChallengeIntroMode(mode) && !unique.includes(mode)) {
+      unique.push(mode);
+    }
+  }
+  return Object.freeze(unique);
+}
+
+export function freezeSaveData(
+  data: Omit<SaveData, 'campaignCatalogVersion' | 'seenChallengeIntros'> & {
+    readonly campaignCatalogVersion?: string;
+    readonly seenChallengeIntros?: readonly ChallengeIntroMode[];
+  },
+): SaveData {
   const completedLevels: Record<string, PersistedLevelRecord> = {};
   for (const [levelId, record] of Object.entries(data.progression.completedLevels)) {
     completedLevels[levelId] = Object.freeze({
@@ -45,11 +70,13 @@ export function freezeSaveData(data: SaveData): SaveData {
   return Object.freeze({
     schemaVersion: CURRENT_SAVE_SCHEMA_VERSION,
     gameId: SAVE_GAME_ID,
+    campaignCatalogVersion: data.campaignCatalogVersion ?? CURRENT_CAMPAIGN_CATALOG_VERSION,
     revision: data.revision,
     updatedAt: data.updatedAt,
     progression,
     settings,
     tutorial,
+    seenChallengeIntros: normalizeSeenChallengeIntros(data.seenChallengeIntros),
   });
 }
 
@@ -62,6 +89,7 @@ export function createDefaultSaveData(options: { readonly updatedAt?: string } =
   return freezeSaveData({
     schemaVersion: CURRENT_SAVE_SCHEMA_VERSION,
     gameId: SAVE_GAME_ID,
+    campaignCatalogVersion: CURRENT_CAMPAIGN_CATALOG_VERSION,
     revision: 0,
     updatedAt: options.updatedAt ?? DEFAULT_SAVE_TIMESTAMP,
     progression: {
@@ -78,5 +106,6 @@ export function createDefaultSaveData(options: { readonly updatedAt?: string } =
       status: 'not_seen',
       completed: false,
     },
+    seenChallengeIntros: [],
   });
 }

@@ -1,6 +1,7 @@
 import type { LevelCatalog } from '../levels/LevelCatalog';
 import { getDefaultLevelCatalog } from '../levels/LevelFactory';
 import type { LevelId } from '../levels/LevelId';
+import { isChallengeIntroMode, type ChallengeIntroMode } from '../models/ChallengeMode';
 import { isEarnedStarRating } from '../models/StarRating';
 import { isMotionPreference } from '../settings/MotionPreference';
 import { createDefaultGameSettings } from '../settings/SettingsDefaults';
@@ -13,6 +14,7 @@ import type {
 } from './SaveData';
 import { DEFAULT_SAVE_TIMESTAMP, freezeSaveData } from './SaveDataFactory';
 import {
+  CURRENT_CAMPAIGN_CATALOG_VERSION,
   CURRENT_SAVE_SCHEMA_VERSION,
   MIN_SUPPORTED_SAVE_SCHEMA_VERSION,
   SAVE_GAME_ID,
@@ -260,6 +262,25 @@ export function validateSaveData(
     repairs.push('Reset invalid updatedAt timestamp to epoch fallback.');
   }
 
+  // Campaign catalogue compatibility check: never bind progression from an incompatible catalogue
+  const rawCatalogVersion = raw.campaignCatalogVersion;
+  let catalogVersionMismatch = false;
+  if (typeof rawCatalogVersion !== 'string' || rawCatalogVersion.trim().length === 0) {
+    errors.push('Missing or invalid campaignCatalogVersion.');
+    repairs.push(
+      `Assigned campaignCatalogVersion "${CURRENT_CAMPAIGN_CATALOG_VERSION}" and reset incompatible progression.`,
+    );
+    catalogVersionMismatch = true;
+  } else if (rawCatalogVersion !== CURRENT_CAMPAIGN_CATALOG_VERSION) {
+    errors.push(
+      `Incompatible campaignCatalogVersion "${rawCatalogVersion}" (active is "${CURRENT_CAMPAIGN_CATALOG_VERSION}").`,
+    );
+    repairs.push(
+      `Reset pre-redesign campaign progression from catalogue "${rawCatalogVersion}" while preserving settings and tutorial status.`,
+    );
+    catalogVersionMismatch = true;
+  }
+
   // Track whether at least one major section was valid so completely scrambled objects stay 'corrupted'
   let validSectionCount = 0;
 
@@ -271,6 +292,9 @@ export function validateSaveData(
   if (!isPlainRecord(rawProgression)) {
     errors.push('Missing or invalid progression section.');
     repairs.push('Recovered empty default progression section.');
+  } else if (catalogVersionMismatch) {
+    // Acknowledge presence of progression object without carrying incompatible level IDs forward
+    validSectionCount += 1;
   } else {
     const rawCompleted = rawProgression.completedLevels;
     if (!isPlainRecord(rawCompleted)) {
@@ -408,6 +432,31 @@ export function validateSaveData(
     }
   }
 
+  // 4. Seen challenge introductions (optional in repaired payloads, validated strictly when present)
+  const seenChallengeIntros: ChallengeIntroMode[] = [];
+  const rawIntros = raw.seenChallengeIntros;
+  if (rawIntros === undefined) {
+    // Gracefully default when omitted without failing otherwise clean saves unless schema requires it
+  } else if (!Array.isArray(rawIntros)) {
+    errors.push('Invalid seenChallengeIntros list.');
+    repairs.push('Recovered empty seenChallengeIntros list.');
+  } else {
+    let invalidEntry = false;
+    for (const item of rawIntros) {
+      if (typeof item === 'string' && isChallengeIntroMode(item)) {
+        if (!seenChallengeIntros.includes(item)) {
+          seenChallengeIntros.push(item);
+        }
+      } else {
+        invalidEntry = true;
+      }
+    }
+    if (invalidEntry) {
+      errors.push('seenChallengeIntros contained unsupported entries.');
+      repairs.push('Dropped invalid entries from seenChallengeIntros.');
+    }
+  }
+
   if (validSectionCount === 0) {
     return Object.freeze({
       valid: false,
@@ -422,6 +471,7 @@ export function validateSaveData(
   const normalized = freezeSaveData({
     schemaVersion: CURRENT_SAVE_SCHEMA_VERSION,
     gameId: SAVE_GAME_ID,
+    campaignCatalogVersion: CURRENT_CAMPAIGN_CATALOG_VERSION,
     revision,
     updatedAt,
     progression: {
@@ -430,6 +480,7 @@ export function validateSaveData(
     },
     settings,
     tutorial,
+    seenChallengeIntros,
   });
 
   if (errors.length === 0) {

@@ -28,8 +28,9 @@ function buildFixtureSave(completedCount: number, musicEnabled = true): string {
   }
 
   return JSON.stringify({
-    schemaVersion: 1,
+    schemaVersion: 2,
     gameId: 'bottle-shuffle',
+    campaignCatalogVersion: '2.0.0',
     revision: 5,
     updatedAt: '2026-11-27T18:00:00.000Z',
     progression: {
@@ -47,6 +48,7 @@ function buildFixtureSave(completedCount: number, musicEnabled = true): string {
       status: 'completed',
       completed: true,
     },
+    seenChallengeIntros: ['timed', 'limited_moves', 'combined'],
   });
 }
 

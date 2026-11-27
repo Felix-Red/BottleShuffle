@@ -18,6 +18,7 @@ export type SaveReason =
   | 'campaign_completion'
   | 'record_improved'
   | 'tutorial_completion'
+  | 'challenge_intro_seen'
   | 'settings_changed'
   | 'last_played_changed'
   | 'repaired_save'

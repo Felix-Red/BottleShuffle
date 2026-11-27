@@ -147,8 +147,8 @@ describe('Level Selection End-to-End Integration Journeys', () => {
     expect(afterReplayRecord?.completionCount).toBe(2);
     expect(afterReplayRecord?.bestElapsedMs).toBeLessThan(beforeReplayBestMs);
 
-    // 4. CHAPTER BOUNDARY: Complete Levels 2..5 (finish Chapter 1) -> Chapter 1 complete, Level 6 unlocked, Ch 2 recommended
-    for (let n = 2; n <= 5; n += 1) {
+    // 4. CHAPTER BOUNDARY: Complete Levels 2..8 (finish Chapter 1) -> Chapter 1 complete, Level 9 unlocked, Ch 2 recommended
+    for (let n = 2; n <= 8; n += 1) {
       solveLevelThroughGameplay(progression, formatLevelId(n), clock, 1000);
     }
     const lsNav3 = makeNav();
@@ -161,13 +161,13 @@ describe('Level Selection End-to-End Integration Journeys', () => {
     expect(view3.chapters[0]?.isCompleted).toBe(true);
     expect(view3.selectedChapterId).toBe('chapter-02');
     expect(view3.recommendedChapterId).toBe('chapter-02');
-    expect(view3.recommendedLevelId).toBe('level-006');
+    expect(view3.recommendedLevelId).toBe('level-009');
     expect(view3.levelCards[0]?.isPlayable).toBe(true);
     expect(view3.levelCards[0]?.isRecommended).toBe(true);
     ls3.dispose();
 
-    // 5. CAMPAIGN COMPLETION: Complete Levels 6..50 -> all 50 replayable, 100%, no nonexistent recommended level
-    for (let n = 6; n <= 50; n += 1) {
+    // 5. CAMPAIGN COMPLETION: Complete Levels 9..50 -> all 50 replayable, 100%, no nonexistent recommended level
+    for (let n = 9; n <= 50; n += 1) {
       const id = formatLevelId(n);
       const att = progression.beginCampaignAttempt(id);
       if (att.accepted) {

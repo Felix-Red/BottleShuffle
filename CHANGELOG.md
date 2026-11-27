@@ -6,6 +6,25 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## [Unreleased] — Campaign Progression Redesign (`Catalogue v2.0.0`, `Save Schema v2`)
+
+Redesigned the 50-level campaign so every level delivers meaningful progression across bottle counts (`3–10`) and four challenge modes (`classic`, `timed`, `limited_moves`, `combined`) while preserving the core hidden-target deduction mechanic.
+
+### Added
+
+- **Configurable Level Challenge Objectives (`src/core/models/ChallengeMode.ts`):** Pure domain support for `classic`, `timed`, `limited_moves`, and `combined` modes inside the single unified `GameEngine`, including `failed` terminal status, `EXPIRE_TIMER` action, `PUZZLE_FAILED` event, `MOVE_LIMIT_REACHED` / `PUZZLE_ALREADY_FAILED` rejections, free select/deselect under move limits, winning-on-final-move precedence, and timer-vs-completion race protection.
+- **Redesigned 50-Level Campaign (`v2.0.0`):** Centralised `CampaignBalanceConfig.ts` driving six progressive chapters — **First Steps** (Classic 3–10B), **Beat the Clock** (Timed 3–10B, `30s–210s`), **Speed Mastery** (Timed 3–10B, `20s–180s`), **Every Move Counts** (Limited Moves 3–10B, `6–45` moves), **Double Trouble** (Combined 3–10B), and **Shuffle Master** (10 unique Combined mastery configs, 6–10B).
+- **Countdown Timer & Failure Flow:** Monotonic countdown support in `GameplayClock`, responsive HUD countdown `ProgressBar` with amber/red urgency feedback (respecting Reduced Motion), and reusable `FailureOverlay` (`"Time's Up!"` / `"Out of Moves!"`) with immediate Retry / Levels / Home and zero lives, cooldowns, or mandatory ads.
+- **Contextual Challenge Introductions:** One-time `ChallengeIntroOverlay` shown on first entry into Timed, Limited Moves, and Combined levels while keeping the countdown paused until dismissed, tracked by `ChallengeIntroService`.
+- **Level Selection Challenge Indicators:** Updated chapter banners, level cards (`metaText` showing bottle count + time/move limit), and `LevelPreviewDialog` challenge objective badges.
+- **Blind-Deduction Campaign Validation & Regression Suite:** Extended `scripts/validate-campaign.mjs` with an automated blind hidden-sequence deduction simulator (zero access to `targetSequence`) and added `tests/unit/campaign/CampaignRedesignRegression.test.ts`.
+
+### Changed
+
+- **Save Schema `v2` & `v1 -> v2` Migration:** Added `campaignCatalogVersion: '2.0.0'` and `seenChallengeIntros` to `SaveData`, bumping `CURRENT_SAVE_SCHEMA_VERSION` from `1` to `2`. Pre-release `v1` saves migrate automatically by preserving player settings and tutorial state while cleanly resetting incompatible pre-redesign `v1` campaign progression.
+
+---
+
 ## [1.0.0-rc.1] — 2026-11-27
 
 Initial release candidate prepared for YouTube Playables certification and staging QA.

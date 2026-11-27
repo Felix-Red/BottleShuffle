@@ -18,18 +18,19 @@ score          = max(1, round(baseScore * difficultyMultiplier * moveEfficiency)
 - `baseScore = 1000`
 - `minimumAwardedScore = 1` (prevents `0`-point completed attempts even on extreme move counts)
 - `minimumRequiredSwaps` is the exact permutation swap distance between the puzzle's original `startingSequence` and `targetSequence`. It is **never** exposed in public gameplay state while a puzzle is active or paused; `GameEngine.getCompletedScoringMetadata()` returns it only after `status === 'completed'`.
-- **Elapsed time is intentionally excluded** from both score and star rating so Bottle Shuffle stays a calm, thoughtful deduction puzzle rather than a speed-rush game. Elapsed time is still tracked and shown as an informational personal best metric.
+- **Elapsed time is intentionally excluded** from both score and star rating (`scoringPolicyVersion: 1` preserved across the Campaign Progression Redesign). On `timed` and `combined` levels, beating the countdown timer is a pass/fail completion requirement rather than a score multiplier, keeping scoring transparent and consistent across all four challenge modes. Elapsed time continues to be tracked as an informational personal best metric.
+- **Failed Attempts:** Attempts that fail due to `time_expired` or `moves_exhausted` never produce an `AttemptResult`, never award stars or scores, never unlock levels, and never weaken or erase previously earned personal best records.
 
-### Difficulty Multipliers
+### Difficulty Multipliers & Bottle-Count Mapping (`Catalogue v2.0.0`)
 
 | Difficulty   | Bottles | Multiplier | Optimal (100%) Score |
-| ------------ | ------: | ---------: | -------------------: |
-| Beginner     |       4 |     `1.0×` |              `1,000` |
-| Easy         |       5 |    `1.25×` |              `1,250` |
-| Normal       |       6 |     `1.5×` |              `1,500` |
-| Intermediate |       7 |     `2.0×` |              `2,000` |
-| Hard         |       8 |     `2.5×` |              `2,500` |
-| Expert       |      10 |     `3.0×` |              `3,000` |
+| ------------ | :-----: | ---------: | -------------------: |
+| Beginner     |    3    |     `1.0×` |              `1,000` |
+| Easy         |    4    |    `1.25×` |              `1,250` |
+| Normal       |    5    |     `1.5×` |              `1,500` |
+| Intermediate |    6    |     `2.0×` |              `2,000` |
+| Hard         |  7 – 8  |     `2.5×` |              `2,500` |
+| Expert       | 9 – 10  |     `3.0×` |              `3,000` |
 
 ### Worked Examples
 

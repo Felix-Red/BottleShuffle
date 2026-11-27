@@ -18,6 +18,7 @@ export interface LevelCardConfig {
   readonly width?: number;
   readonly height?: number;
   readonly levelNumber: number;
+  readonly metaText?: string;
   readonly stars?: number;
   readonly showStars?: boolean;
   readonly status?: LevelCardStatus;
@@ -49,7 +50,9 @@ export class LevelCard extends Phaser.GameObjects.Container {
   private readonly iconGraphics: Phaser.GameObjects.Graphics;
   private readonly numberText: Phaser.GameObjects.Text;
   private readonly badgeText: Phaser.GameObjects.Text;
+  private readonly metaLabelText: Phaser.GameObjects.Text;
   private readonly starRating: StarRating;
+  private metaLabelValue: string;
   private readonly hitZone: Phaser.GameObjects.Zone;
   private activeTween?: Phaser.Tweens.Tween;
   private pulseTween?: Phaser.Tweens.Tween;
@@ -65,6 +68,7 @@ export class LevelCard extends Phaser.GameObjects.Container {
     this.selected = config.selected ?? false;
     this.focused = config.focused ?? false;
     this.showStars = config.showStars ?? config.stars !== undefined;
+    this.metaLabelValue = config.metaText ?? '';
     this.accentColor = config.accentColor;
     this.onSelectCallback = config.onSelect;
     this.onLockedSelectCallback = config.onLockedSelect;
@@ -99,6 +103,20 @@ export class LevelCard extends Phaser.GameObjects.Container {
       )
       .setOrigin(0.5);
 
+    this.metaLabelText = scene.add
+      .text(
+        0,
+        this.cardHeight / 2 - Dimens.Space16,
+        this.metaLabelValue,
+        createTextStyle(Typography.LabelSmall, {
+          color: Colors.Text.Secondary,
+          align: 'center',
+          scale: 0.68,
+          minFontSize: 9,
+        }),
+      )
+      .setOrigin(0.5);
+
     this.starRating = new StarRating(scene, {
       x: 0,
       y: this.cardHeight / 2 - Dimens.Space24,
@@ -124,6 +142,7 @@ export class LevelCard extends Phaser.GameObjects.Container {
       this.iconGraphics,
       this.numberText,
       this.badgeText,
+      this.metaLabelText,
       this.starRating,
       this.hitZone,
     ]);
@@ -164,6 +183,16 @@ export class LevelCard extends Phaser.GameObjects.Container {
   public setLevelNumber(levelNumber: number): this {
     this.levelNumber = levelNumber;
     this.numberText.setText(String(levelNumber));
+    return this;
+  }
+
+  public setMetaText(metaText?: string): this {
+    const next = metaText ?? '';
+    if (this.metaLabelValue === next) {
+      return this;
+    }
+    this.metaLabelValue = next;
+    this.refreshVisuals();
     return this;
   }
 
@@ -417,40 +446,70 @@ export class LevelCard extends Phaser.GameObjects.Container {
     this.numberText.setText(String(this.levelNumber));
     this.numberText.setVisible(true);
 
+    const hasMeta = this.metaLabelValue.length > 0;
+    const fitMetaWidth = (): void => {
+      if (!hasMeta) {
+        this.metaLabelText.setVisible(false);
+        return;
+      }
+      this.metaLabelText.setVisible(true);
+      this.metaLabelText.setText(this.metaLabelValue);
+      this.metaLabelText.setScale(1);
+      const maxMetaW = Math.max(40, this.cardWidth - 12);
+      if (this.metaLabelText.width > maxMetaW) {
+        this.metaLabelText.setScale(maxMetaW / Math.max(1, this.metaLabelText.width));
+      }
+    };
+
     if (isLocked) {
       this.badgeText.setVisible(false);
       this.starRating.setVisible(false);
       this.numberText.setColor(Colors.Text.Disabled);
       this.numberText.setAlpha(0.75);
-      this.numberText.setPosition(0, -Math.round(this.cardHeight * 0.16));
+      this.numberText.setPosition(
+        0,
+        hasMeta ? -Math.round(this.cardHeight * 0.22) : -Math.round(this.cardHeight * 0.16),
+      );
       drawIcon(
         this.iconGraphics,
         'lock',
         0,
-        Math.round(this.cardHeight * 0.19),
-        isCompactCard ? 18 : 22,
+        hasMeta ? Math.round(this.cardHeight * 0.04) : Math.round(this.cardHeight * 0.19),
+        isCompactCard ? 16 : 19,
         Colors.Text.Disabled,
         0.82,
       );
+      fitMetaWidth();
+      this.metaLabelText.setColor(Colors.Text.Disabled);
+      this.metaLabelText.setAlpha(0.75);
+      this.metaLabelText.setPosition(0, this.cardHeight / 2 - (isCompactCard ? 11 : 14));
       return;
     }
 
     this.numberText.setAlpha(1);
     this.numberText.setColor(isCurrent ? Colors.Text.OnPrimary : Colors.Text.Primary);
+    this.metaLabelText.setAlpha(1);
 
     if (isCurrent) {
       this.badgeText.setVisible(true);
-      this.badgeText.setPosition(0, -this.cardHeight / 2 + (isCompactCard ? 12 : 15));
-      this.numberText.setPosition(0, isCompactCard ? -1 : -3);
-      drawIcon(
-        this.iconGraphics,
-        'play',
-        0,
-        this.cardHeight / 2 - (isCompactCard ? 16 : 20),
-        isCompactCard ? 14 : 16,
-        Colors.Text.OnPrimary,
-        0.95,
-      );
+      this.badgeText.setPosition(0, -this.cardHeight / 2 + (isCompactCard ? 11 : 14));
+      this.numberText.setPosition(0, hasMeta ? -4 : isCompactCard ? -1 : -3);
+      if (hasMeta) {
+        fitMetaWidth();
+        this.metaLabelText.setColor(Colors.Text.OnPrimary);
+        this.metaLabelText.setPosition(0, this.cardHeight / 2 - (isCompactCard ? 13 : 16));
+      } else {
+        this.metaLabelText.setVisible(false);
+        drawIcon(
+          this.iconGraphics,
+          'play',
+          0,
+          this.cardHeight / 2 - (isCompactCard ? 16 : 20),
+          isCompactCard ? 14 : 16,
+          Colors.Text.OnPrimary,
+          0.95,
+        );
+      }
       this.starRating.setVisible(false);
       return;
     }
@@ -458,11 +517,17 @@ export class LevelCard extends Phaser.GameObjects.Container {
     this.badgeText.setVisible(false);
 
     if (this.showStars) {
-      this.numberText.setPosition(0, -12);
+      this.numberText.setPosition(0, hasMeta ? -20 : -12);
+      fitMetaWidth();
+      this.metaLabelText.setColor(Colors.Text.Secondary);
+      this.metaLabelText.setPosition(0, isCompactCard ? 3 : 4);
       this.starRating.setVisible(true);
-      this.starRating.setPosition(0, this.cardHeight / 2 - Dimens.Space24);
+      this.starRating.setPosition(0, this.cardHeight / 2 - (isCompactCard ? 14 : 18));
     } else {
-      this.numberText.setPosition(0, isCompleted ? -6 : 0);
+      this.numberText.setPosition(0, hasMeta ? -10 : isCompleted ? -6 : 0);
+      fitMetaWidth();
+      this.metaLabelText.setColor(Colors.Text.Secondary);
+      this.metaLabelText.setPosition(0, this.cardHeight / 2 - (isCompactCard ? 13 : 17));
       this.starRating.setVisible(false);
     }
 

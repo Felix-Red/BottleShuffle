@@ -46,5 +46,23 @@ Excluded from coverage with explicit justification in `vitest.config.ts`: ambien
 - **Public Production Release Status:** **Not yet cleared for public YouTube Playables launch** due to external manual gates:
   1. Official hosted **YouTube Playables SDK Test Suite** verification (core SDK + live interstitial ad hooks).
   2. Cross-browser execution on **Firefox** and **WebKit/Safari** plus **physical iOS & Android YouTube app WebView** QA.
-  3. **Human playtesting** with unfamiliar players and **subjective audio quality** listening check.
+  3. **Human playtesting** with unfamiliar players (including empirical tuning of the redesigned Chapter 2–6 time/move limits) and **subjective audio quality** listening check.
   4. **Developer Portal** submission, advertiser-friendly content review, monetisation toggle configuration, and Google certification approval.
+
+---
+
+## 4. Campaign Progression Redesign (`Catalogue v2.0.0`, `Save Schema v2`) Verification Update
+
+Re-verified after redesigning the 50-level campaign across `classic`, `timed`, `limited_moves`, and `combined` challenge modes:
+
+| Check                                                        |     Result     | Evidence                                                                                                                                    |
+| :----------------------------------------------------------- | :------------: | :------------------------------------------------------------------------------------------------------------------------------------------ |
+| TypeScript (`npm run typecheck`)                             |    **PASS**    | `0` errors                                                                                                                                  |
+| ESLint (`npm run lint`)                                      |    **PASS**    | `0` errors, `0` warnings                                                                                                                    |
+| Prettier (`npm run format:check`)                            |    **PASS**    | All files formatted                                                                                                                         |
+| Vitest Unit + Integration + Regression (`npm test`)          |    **PASS**    | **78/78** test files passed; **335/335** tests passed (`0` failed, `0` skipped), including `CampaignRedesignRegression.test.ts`             |
+| 50-Level Campaign & Balance Validation (`validate:campaign`) |    **PASS**    | **50/50** valid & mathematically solved; **50/50** unique puzzles; **10/10** unique Chapter 6 configs; Schema v2 save `415 B` – `7,171 B`   |
+| Playwright E2E Suite (`npm run test:e2e`)                    |    **PASS**    | **10/10** passed across Desktop (`1280×720`) & Mobile Touch (`390×844`) against rebuilt production `dist/`                                  |
+| Production Build & YouTube Audit (`npm run build:youtube`)   |    **PASS**    | `2.33 MiB` total (`1,006.78 KiB` gzip, `47` files); `1.71 MiB` initial JS+HTML (`443.65 KiB` gzip); `0` third-party ads/dev leaks           |
+| Asset Validation (`npm run validate:assets`)                 |    **PASS**    | `39` referenced runtime assets verified, `0` missing, `0` unused, `0` duplicate binaries                                                    |
+| Human Playtesting of Redesigned Time & Move Limits           | **Not tested** | Automated blind-deduction simulation completed (`50/50` solvable; `13/50` tight heuristic move flags in late Ch 4–6); real human QA pending |

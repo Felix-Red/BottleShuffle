@@ -93,8 +93,9 @@ export class LevelPreviewDialog {
     const hasActualRecords =
       preview.isCompleted && preview.bestMoveCount !== null && preview.formattedBestTime !== null;
 
-    const bottleRowY = hasActualRecords ? -58 : -32;
-    const descY = hasActualRecords ? -6 : 24;
+    const bottleRowY = hasActualRecords ? -66 : -40;
+    const objectiveBadgeY = hasActualRecords ? -16 : 12;
+    const descY = hasActualRecords ? 12 : 44;
 
     // Decorative bottle preview strip (reuses bundled textures, never real puzzle order)
     const ids = visual.decorativeBottleIds;
@@ -124,6 +125,28 @@ export class LevelPreviewDialog {
       content.add(img);
     });
 
+    const objectiveAccent =
+      preview.challengeMode === 'classic'
+        ? Colors.Semantic.Success
+        : preview.challengeMode === 'timed'
+          ? Colors.Semantic.Info
+          : preview.challengeMode === 'limited_moves'
+            ? Colors.Brand.Secondary
+            : Colors.Bottle.Orange;
+
+    const objectiveBadge = this.scene.add
+      .text(
+        0,
+        objectiveBadgeY,
+        preview.objectiveSummary,
+        createTextStyle(Typography.LabelMedium, {
+          color: objectiveAccent,
+          align: 'center',
+        }),
+      )
+      .setOrigin(0.5);
+    content.add(objectiveBadge);
+
     const descText = this.scene.add
       .text(
         0,
@@ -140,8 +163,8 @@ export class LevelPreviewDialog {
 
     if (hasActualRecords) {
       const panelW = 344;
-      const panelH = 82;
-      const panelY = 58;
+      const panelH = 80;
+      const panelY = 72;
 
       const panelGfx = this.scene.add.graphics();
       panelGfx.setPosition(0, panelY);
@@ -208,13 +231,13 @@ export class LevelPreviewDialog {
       content.add(statsLine);
     }
 
-    const subtitle = `${preview.chapterName}  ·  ${preview.difficultyDisplayName} · ${String(preview.bottleCount)} Bottles`;
+    const subtitle = `${preview.chapterName}  ·  ${String(preview.bottleCount)} Bottles  ·  ${preview.challengeModeLabel}`;
 
     this.modal = new Modal(this.scene, {
       title: `Level ${String(preview.levelNumber)}`,
       message: subtitle,
       content,
-      contentHeight: hasActualRecords ? 196 : 120,
+      contentHeight: hasActualRecords ? 222 : 144,
       width: 430,
       dismissible: true,
       theme: this.theme,

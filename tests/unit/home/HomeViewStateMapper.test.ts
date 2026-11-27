@@ -33,8 +33,8 @@ describe('HomeViewStateMapper', () => {
     expect(newView.totalLevelCount).toBe(50);
     expect(newView.completionPercentage).toBe(0);
 
-    // Complete Levels 1..7 -> returning player recommends Level 8 (Chapter 2 · Getting Warmer)
-    for (let n = 1; n <= 7; n += 1) {
+    // Complete Levels 1..9 -> returning player recommends Level 10 (Chapter 2 · Beat the Clock)
+    for (let n = 1; n <= 9; n += 1) {
       state = engine.recordCompletion(state, {
         levelId: formatLevelId(n),
         attemptId: `att-${String(n)}`,
@@ -43,7 +43,7 @@ describe('HomeViewStateMapper', () => {
       }).state;
     }
 
-    // Replaying Level 1 must NOT move recommended level backwards from Level 8
+    // Replaying Level 1 must NOT move recommended level backwards from Level 10
     state = engine.recordCompletion(state, {
       levelId: 'level-001',
       attemptId: 'att-replay-1',
@@ -58,15 +58,15 @@ describe('HomeViewStateMapper', () => {
     });
     expect(returningView.playerStatus).toBe('returning');
     expect(returningView.primaryActionLabel).toBe('CONTINUE');
-    expect(returningView.primarySupportingText).toBe('Level 8');
-    expect(returningView.recommendedLevelId).toBe('level-008');
-    expect(returningView.recommendedChapterName).toBe('Getting Warmer');
+    expect(returningView.primarySupportingText).toBe('Level 10');
+    expect(returningView.recommendedLevelId).toBe('level-010');
+    expect(returningView.recommendedChapterName).toBe('Beat the Clock');
     expect(returningView.recommendedChapterOrder).toBe(2);
-    expect(returningView.completedLevelCount).toBe(7);
-    expect(returningView.completionPercentage).toBe(14);
+    expect(returningView.completedLevelCount).toBe(9);
+    expect(returningView.completionPercentage).toBe(18);
 
-    // Complete remaining levels 8..50 -> Campaign Completed state
-    for (let n = 8; n <= 50; n += 1) {
+    // Complete remaining levels 10..50 -> Campaign Completed state
+    for (let n = 10; n <= 50; n += 1) {
       state = engine.recordCompletion(state, {
         levelId: formatLevelId(n),
         attemptId: `att-${String(n)}`,

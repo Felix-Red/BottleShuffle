@@ -1,9 +1,14 @@
 import { PUZZLE_GENERATOR_VERSION } from '../engine/PuzzleGenerator';
 import { validateBottleCount, validatePuzzleConfig } from '../engine/PuzzleValidator';
 import { ProgressionError } from '../errors/ProgressionError';
+import { isChallengeMode, validateChallengeObjective } from '../models/ChallengeMode';
 import { isDifficultyId } from '../models/Difficulty';
 import type { ChapterDefinition } from './ChapterDefinition';
-import { toLevelPuzzleConfig, type LevelDefinition } from './LevelDefinition';
+import {
+  toLevelChallengeObjective,
+  toLevelPuzzleConfig,
+  type LevelDefinition,
+} from './LevelDefinition';
 import { isValidChapterId, isValidLevelId, type ChapterId, type LevelId } from './LevelId';
 
 export interface LevelCatalogValidationResult {
@@ -55,11 +60,24 @@ export function validateLevelCatalog(
       );
     }
 
+    if (!isChallengeMode(chapter.challengeMode)) {
+      errors.push(
+        `Chapter "${chapter.id}" has invalid challengeMode: "${String(chapter.challengeMode)}".`,
+      );
+    }
+
     try {
       validateBottleCount(chapter.bottleCount);
+      validateBottleCount(chapter.minBottleCount);
+      validateBottleCount(chapter.maxBottleCount);
+      if (chapter.minBottleCount > chapter.maxBottleCount) {
+        errors.push(
+          `Chapter "${chapter.id}" minBottleCount (${String(chapter.minBottleCount)}) exceeds maxBottleCount (${String(chapter.maxBottleCount)}).`,
+        );
+      }
     } catch {
       errors.push(
-        `Chapter "${chapter.id}" has unsupported bottle count: ${String(chapter.bottleCount)}.`,
+        `Chapter "${chapter.id}" has unsupported bottle count bounds (${String(chapter.minBottleCount)}..${String(chapter.maxBottleCount)}).`,
       );
     }
 
@@ -119,14 +137,12 @@ export function validateLevelCatalog(
           `Level "${level.id}" references chapter "${chapter.id}" but is not listed in chapter.levelIds.`,
         );
       }
-      if (level.difficulty !== chapter.difficulty) {
+      if (
+        level.bottleCount < chapter.minBottleCount ||
+        level.bottleCount > chapter.maxBottleCount
+      ) {
         errors.push(
-          `Level "${level.id}" difficulty "${level.difficulty}" does not match chapter "${chapter.id}" difficulty "${chapter.difficulty}".`,
-        );
-      }
-      if (level.bottleCount !== chapter.bottleCount) {
-        errors.push(
-          `Level "${level.id}" bottleCount ${String(level.bottleCount)} does not match chapter "${chapter.id}" bottleCount ${String(chapter.bottleCount)}.`,
+          `Level "${level.id}" bottleCount ${String(level.bottleCount)} is outside chapter "${chapter.id}" range [${String(chapter.minBottleCount)}, ${String(chapter.maxBottleCount)}].`,
         );
       }
     }
@@ -142,7 +158,14 @@ export function validateLevelCatalog(
     }
 
     try {
-      validatePuzzleConfig(toLevelPuzzleConfig(level));
+      const resolvedConfig = validatePuzzleConfig(toLevelPuzzleConfig(level));
+      const objectiveErrors = validateChallengeObjective(
+        toLevelChallengeObjective(level),
+        resolvedConfig.minRequiredSwaps,
+      );
+      for (const err of objectiveErrors) {
+        errors.push(`Level "${level.id}": ${err}`);
+      }
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       errors.push(`Level "${level.id}" has invalid puzzle constraints: ${msg}`);
@@ -178,7 +201,6 @@ export function validateLevelCatalog(
     errors.push('Level catalogue must have at least one initially unlocked root level.');
   }
 
-  // Detect cycles & unreachable levels by walking prerequisite chains
   const reachable = new Set<LevelId>();
   const visiting = new Set<LevelId>();
 

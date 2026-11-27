@@ -1,5 +1,6 @@
 import type { GamePlatform, Unsubscribe } from '../../platform/contracts/GamePlatform';
 import type { ProgressionController } from '../../game/progression/ProgressionController';
+import type { ChallengeIntroService } from '../ChallengeIntroService';
 import type { SettingsService } from '../SettingsService';
 import type { TutorialPreferenceService } from '../TutorialPreferenceService';
 import type { SaveService } from './SaveService';
@@ -9,6 +10,7 @@ export interface SaveCoordinatorOptions {
   readonly progressionController: ProgressionController;
   readonly settingsService: SettingsService;
   readonly tutorialPreference: TutorialPreferenceService;
+  readonly challengeIntroService?: ChallengeIntroService;
   readonly platform?: GamePlatform;
 }
 
@@ -74,6 +76,17 @@ export class SaveCoordinator {
         this.saveService.requestSave('tutorial_completion', 'high');
       }),
     );
+
+    if (options.challengeIntroService !== undefined) {
+      this.unsubscribers.push(
+        options.challengeIntroService.onChange(() => {
+          if (this.disposed || this.saveService.isRestoring()) {
+            return;
+          }
+          this.saveService.requestSave('challenge_intro_seen', 'normal');
+        }),
+      );
+    }
 
     if (options.platform !== undefined) {
       this.unsubscribers.push(
